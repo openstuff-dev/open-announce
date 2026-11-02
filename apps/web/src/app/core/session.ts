@@ -1,0 +1,42 @@
+import { Injectable, computed, inject, signal } from '@angular/core';
+import type { Me, Role } from '@open-announce/contracts';
+import { Api } from './api';
+
+/** Who is signed in, and what they may do in the tenant they're looking at. */
+@Injectable({ providedIn: 'root' })
+export class Session {
+  private readonly api = inject(Api);
+  readonly me = signal<Me | null>(null);
+  /** The tenant in the URL. Set by the shell. */
+  readonly tenant = signal<string | null>(null);
+
+  readonly role = computed<Role | null>(() => {
+    const slug = this.tenant();
+    return this.me()?.tenants.find((t) => t.slug === slug)?.role ?? null;
+  });
+
+  readonly isAdmin = computed(() => this.role() === 'admin');
+
+  /** Loads the account; null when nobody is signed in. */
+  async load(): Promise<Me | null> {
+    try {
+      const me = await this.api.get<Me>('/api/me');
+      this.me.set(me);
+      return me;
+    } catch {
+      this.me.set(null);
+      return null;
+    }
+  }
+
+  async signIn(email: string, password: string): Promise<void> {
+    await this.api.post('/api/session', { email, password });
+    await this.load();
+  }
+
+  async signOut(): Promise<void> {
+    await this.api.delete('/api/session');
+    this.api.clear();
+    this.me.set(null);
+  }
+}
