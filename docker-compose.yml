@@ -1,8 +1,41 @@
 services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: openannounce
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-openannounce}
+      POSTGRES_DB: openannounce
+    volumes:
+      - openannounce-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U openannounce']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   app:
     build: .
+    depends_on:
+      db:
+        condition: service_healthy
     environment:
+      DATABASE_URL: postgres://openannounce:${POSTGRES_PASSWORD:-openannounce}@db:5432/openannounce
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      # Where people and host systems reach OpenAnnounce. See the README.
+      OPENANNOUNCE_PUBLIC_URL: ${OPENANNOUNCE_PUBLIC_URL:-http://localhost:8080}
+      # The first admin. Without a password, one is made and shown once in the log.
+      OPENANNOUNCE_ADMIN_EMAIL: ${OPENANNOUNCE_ADMIN_EMAIL:-admin@example.com}
+      OPENANNOUNCE_ADMIN_PASSWORD: ${OPENANNOUNCE_ADMIN_PASSWORD:-}
+      OPENANNOUNCE_SESSION_DAYS: ${OPENANNOUNCE_SESSION_DAYS:-30}
+      OPENANNOUNCE_FEED_MAX_AGE: ${OPENANNOUNCE_FEED_MAX_AGE:-60}
+      # Behind a reverse proxy: true, or the proxy's addresses. See the README.
+      OPENANNOUNCE_TRUST_PROXY: ${OPENANNOUNCE_TRUST_PROXY:-}
+      # on: serve the demo host page at /demo (run the demo seed first).
+      OPENANNOUNCE_DEMO: ${OPENANNOUNCE_DEMO:-off}
     ports:
       - '${PORT:-8080}:8080'
     restart: unless-stopped
+
+volumes:
+  openannounce-db:
