@@ -1,0 +1,83 @@
+{
+  "name": "@openstuff-dev/announce",
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/core/index.d.ts",
+      "import": "./dist/core/index.js"
+    },
+    "./core": {
+      "types": "./dist/core/index.d.ts",
+      "import": "./dist/core/index.js"
+    },
+    "./announcements": {
+      "types": "./dist/announcements/index.d.ts",
+      "import": "./dist/announcements/index.js"
+    },
+    "./maintenance": {
+      "types": "./dist/maintenance/index.d.ts",
+      "import": "./dist/maintenance/index.js"
+    },
+    "./news": {
+      "types": "./dist/news/index.d.ts",
+      "import": "./dist/news/index.js"
+    },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "import": "./dist/server/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "!**/*.tsbuildinfo"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.1"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/openstuff-dev/open-announce.git",
+    "directory": "packages/announce"
+  },
+  "nx": {
+    "name": "announce",
+    "tags": [
+      "type:package"
+    ],
+    "targets": {
+      "build": {
+        "outputs": [
+          "{projectRoot}/dist"
+        ]
+      }
+    }
+  },
+  "description": "Show News, Announcements and Maintenance messages from OpenAnnounce in any web app: framework-neutral web components and a signer for your backend.",
+  "sideEffects": [
+    "./dist/announcements/*",
+    "./dist/maintenance/*",
+    "./dist/news/*"
+  ],
+  "keywords": [
+    "announcements",
+    "maintenance",
+    "news",
+    "banner",
+    "web-components",
+    "openannounce"
+  ],
+  "engines": {
+    "node": ">=20"
+  }
+}

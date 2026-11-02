@@ -1,46 +1,157 @@
-# Open Announce
+# OpenAnnounce
 
-An OpenStuff project, built on the OpenStuff toolkit (`@openstuff-dev/ui`, `@openstuff-dev/tokens`
-and `@openstuff-dev/lint`).
+News, announcements and maintenance messages for every system your company runs, shown to the
+right people.
+
+Admins write a message once, aim it at systems and user groups, and publish it. Each system shows
+it with three web components from [`@openstuff-dev/announce`](packages/announce): a banner, a
+popup, a corner popover or a news sidebar, depending on the message.
+
+| Kind | Shows as | Can users close it? |
+|---|---|---|
+| Announcement | Banner or popup | Yes, until the message is edited |
+| Maintenance | Banner | No |
+| Maintenance | Popover | The admin decides per message |
+| News | Sidebar, opened by a button you choose | It's a sidebar: they open and close it |
+
+The hosted version runs at https://announce.openstuff.app; the project's page is
+https://announce.openstuff.dev.
+
+## Who does what
+
+- **Server admins** add tenants: a company or a division, kept apart from the others with
+  Postgres row-level security.
+- **Admins** of a tenant add systems, groups, users and members, and write the messages.
+- **Developers** add OpenAnnounce to a system: they copy its public key, set the origins that may
+  read its feed, replace its secret, and sign users in their backend.
+- **Users** see the messages for their groups in the systems they use.
+
+## Try it
+
+```sh
+cp .env.example .env
+docker compose up -d --build
+docker compose logs app | grep "first admin"   # the admin's password, shown once
+```
+
+Open http://localhost:8080 and sign in. To see the elements in a pretend host system, seed the
+demo tenant and turn the demo page on:
+
+```sh
+OPENANNOUNCE_DEMO=on docker compose up -d
+docker compose exec app node dist/seed-demo.js
+```
+
+Then open http://localhost:8080/demo and switch between Alice (staff) and Bob (staff and finance).
+
+## Add it to a system
+
+In the admin app, open **Systems**, add the system, and copy its secret: it's shown once. The
+system's setup tabs have the code below with your own URL and key filled in.
+
+```sh
+npm install @openstuff-dev/announce
+```
+
+```js
+// openannounce.config.js
+import { defineConfig } from '@openstuff-dev/announce';
+
+export default defineConfig({
+  url: 'https://announce.example.com',
+  publicKey: 'pk_…',
+  // A token your backend makes for the signed-in user. Leave it out to show only the
+  // messages meant for everyone.
+  user: () => fetch('/api/openannounce-token').then((r) => r.text()),
+});
+```
+
+```html
+<oa-maintenance></oa-maintenance>
+<oa-announcements></oa-announcements>
+<oa-news trigger=".news-button"></oa-news>
+
+<script type="module">
+  import { configure } from '@openstuff-dev/announce';
+  import '@openstuff-dev/announce/announcements';
+  import '@openstuff-dev/announce/maintenance';
+  import '@openstuff-dev/announce/news';
+  import config from './openannounce.config.js';
+  configure(config);
+</script>
+```
+
+```js
+// Your backend, for the signed-in user
+import { signUser } from '@openstuff-dev/announce/server';
+
+const token = await signUser(process.env.OPENANNOUNCE_SECRET, {
+  sub: user.id, // their id in your system
+  groups: ['finance'], // group slugs; leave out to use the groups set in OpenAnnounce
+});
+```
+
+No bundler? The server also serves the elements at `/sdk/`, for an import map. See
+[the package's README](packages/announce/README.md) for styling, events and the full API.
+
+### How fresh is a message?
+
+The elements share one request per page. They reuse a fetched feed for `cacheTtl` seconds
+(default 60, also across page loads), then ask again with `If-None-Match`, so an unchanged feed
+costs a 304. An open page checks every `refreshInterval` seconds (default 300). What a user
+closed is remembered in their browser until the message is edited.
+
+## Settings
+
+| Variable | Default | What it does |
+|---|---|---|
+| `DATABASE_URL` | `postgres://openannounce:openannounce@localhost:5432/openannounce` | The Postgres database. Compose sets it. |
+| `POSTGRES_PASSWORD` | `openannounce` | The database password compose uses. Change it on a server. |
+| `PORT` | `8080` | The port on this machine. |
+| `LOG_LEVEL` | `info` | `fatal`, `error`, `warn`, `info`, `debug` or `trace`. |
+| `OPENANNOUNCE_PUBLIC_URL` | `http://localhost:8080` | Where people and systems reach OpenAnnounce. Cookies are `Secure` when it's `https://`, and changes posted from other origins are refused. |
+| `OPENANNOUNCE_ADMIN_EMAIL` | `admin@example.com` | The first server admin, made on the first start. |
+| `OPENANNOUNCE_ADMIN_PASSWORD` | _(made and logged once)_ | That admin's password. |
+| `OPENANNOUNCE_SESSION_DAYS` | `30` | How long people stay signed in. |
+| `OPENANNOUNCE_FEED_MAX_AGE` | `60` | How long browsers may reuse a feed, in seconds (`Cache-Control: private, max-age`). |
+| `OPENANNOUNCE_TRUST_PROXY` | _(off)_ | Behind a reverse proxy: `true`, or the proxy's addresses, so rate limits see real client addresses. |
+| `OPENANNOUNCE_DEMO` | `off` | `on` serves the demo host page at `/demo`. |
+
+**Security.** The database user may be a superuser (the Docker default): every connection drops
+to the `openannounce_app` role, which row-level security applies to. If it can't, the server
+refuses to start. A system's secret stays on your backend; the browser only gets the public key
+and a signed, expiring user token. Sign-in is rate limited per address and email.
 
 ## Develop
 
 ```sh
 npm install
-npx nx serve web       # http://localhost:4200
-npx nx dev server       # the API on http://localhost:8080; the web app sends /api there
+docker run -d --name openannounce-db -e POSTGRES_USER=openannounce \
+  -e POSTGRES_PASSWORD=openannounce -e POSTGRES_DB=openannounce -p 5432:5432 postgres:16-alpine
+npx nx dev server       # the API on http://localhost:8080
+npx nx serve web        # the admin app on http://localhost:4200; /api and /sdk go to the server
 ```
 
-Before you push, run what CI runs:
+Before you push, run what CI runs. The server's tests need a database, which they empty first:
 
 ```sh
-npx nx run-many -t lint stylelint typecheck test build
+TEST_DATABASE_URL=postgres://openannounce:openannounce@localhost:5432/openannounce_test \
+  npx nx run-many -t lint stylelint typecheck test build
 ```
 
-## Run it with Docker
-
-```sh
-cp .env.example .env
-docker compose up --build
-```
-
-It's on http://localhost:8080.
-
-## Theme
-
-Every colour, light and dark, is generated from one `primaryColor` in
-`apps/web/tokens.config.json`. Change it and rebuild.
+Without `TEST_DATABASE_URL` those tests are skipped.
 
 ## Layout
 
 | Folder | What's in it |
 |---|---|
-| `apps/web` | The Angular web app |
-| `apps/server` | The Fastify API, which also serves the web app in production |
-| `packages/` | Shared and published packages (`npx nx g @openstuff-dev/nx:library <name>`) |
+| `apps/web` | The admin app (Angular, on the OpenStuff toolkit) |
+| `apps/server` | The Fastify API and feed, the migrations and the demo page. In production it also serves the admin app and `/sdk` |
+| `packages/announce` | `@openstuff-dev/announce`: the web components, the feed client and `signUser`, published to npm |
+| `packages/contracts` | Types the server and admin app share (not published) |
+| `site` | The marketing page for https://announce.openstuff.dev |
 
-New Angular components: `npx nx g @openstuff-dev/nx:component <name>`. To pick up newer shared
-files and toolkit versions: `npx nx g @openstuff-dev/nx:sync`.
+The theme of the admin app comes from one `primaryColor` in `apps/web/tokens.config.json`.
 
 ## Agents
 
