@@ -8,5 +8,5 @@
   <text x="196" y="148" fill="#eef0f6" font-family="Geist, system-ui, sans-serif" font-size="44" font-weight="500" letter-spacing="-1">Open<tspan font-weight="700">Announce</tspan></text>
   <text x="96" y="320" fill="#eef0f6" font-family="Geist, system-ui, sans-serif" font-size="76" font-weight="600" letter-spacing="-3"><tspan x="96">One place for every</tspan><tspan x="96" dy="88">message your systems show</tspan></text>
   <text x="96" y="460" fill="#a9afbd" font-family="Geist, system-ui, sans-serif" font-size="34">News, announcements and maintenance, in every system you run.</text>
-  <text x="96" y="550" fill="#7d8494" font-family="Geist Mono, ui-monospace, monospace" font-size="24">openannounce.dev · Open source · MIT</text>
+  <text x="96" y="550" fill="#7d8494" font-family="Geist Mono, ui-monospace, monospace" font-size="24">announce.openstuff.dev · Open source · MIT</text>
 </svg>

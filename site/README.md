@@ -1,6 +1,6 @@
 # OpenAnnounce site
 
-The marketing page for OpenAnnounce, served at https://openannounce.dev. Plain HTML on the OpenStuff
+The marketing page for OpenAnnounce, served at https://announce.openstuff.dev. Plain HTML on the OpenStuff
 toolkit: it looks and behaves like every other OpenStuff project's page. No build step, no
 trackers, no external requests.
 
@@ -100,9 +100,9 @@ was generated with `--glyph`; make sure no other project uses the same shape. Th
 `.github/workflows/pages.yml` publishes this folder on every push that changes it. Once:
 
 1. **Settings → Pages → Build and deployment → Source: GitHub Actions.**
-2. At the DNS provider for `openstuff.dev`, add a `CNAME` record for `openannounce.dev` →
+2. At the DNS provider for `openstuff.dev`, add a `CNAME` record for `announce.openstuff.dev` →
    `openstuff-dev.github.io`.
-3. **Settings → Pages → Custom domain:** `openannounce.dev`, then tick **Enforce HTTPS**. (Deploys
+3. **Settings → Pages → Custom domain:** `announce.openstuff.dev`, then tick **Enforce HTTPS**. (Deploys
    through Actions ignore a `CNAME` file, so there isn't one.)
 
 ## Update the toolkit

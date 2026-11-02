@@ -14,6 +14,9 @@ popup, a corner popover or a news sidebar, depending on the message.
 | Maintenance | Popover | The admin decides per message |
 | News | Sidebar, opened by a button you choose | It's a sidebar: they open and close it |
 
+The hosted version runs at https://announce.openstuff.app; the project's page is
+https://announce.openstuff.dev.
+
 ## Who does what
 
 - **Server admins** add tenants: a company or a division, kept apart from the others with
@@ -146,7 +149,7 @@ Without `TEST_DATABASE_URL` those tests are skipped.
 | `apps/server` | The Fastify API and feed, the migrations and the demo page. In production it also serves the admin app and `/sdk` |
 | `packages/announce` | `@openstuff-dev/announce`: the web components, the feed client and `signUser`, published to npm |
 | `packages/contracts` | Types the server and admin app share (not published) |
-| `site` | The marketing page for https://openannounce.dev |
+| `site` | The marketing page for https://announce.openstuff.dev |
 
 The theme of the admin app comes from one `primaryColor` in `apps/web/tokens.config.json`.
 
