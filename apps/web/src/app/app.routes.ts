@@ -23,6 +23,11 @@ export const routes: Routes = [
     children: [
       { path: '', component: Start, title: 'OpenAnnounce' },
       {
+        path: 'settings',
+        loadComponent: () => import('./pages/settings').then((m) => m.Settings),
+        title: 'Settings · OpenAnnounce',
+      },
+      {
         path: 'tenants',
         canActivate: [serverAdmin],
         loadComponent: () => import('./pages/tenants').then((m) => m.Tenants),

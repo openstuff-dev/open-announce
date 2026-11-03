@@ -1,4 +1,9 @@
-import type { Display, Kind, MessageStatus, Severity } from '@open-announce/contracts';
+import type { Display, Kind, MessageStatus, Role, Severity } from '@open-announce/contracts';
+
+export const roleLabels: Record<Role, string> = {
+  admin: 'Admin',
+  developer: 'Developer',
+};
 
 export const kindLabels: Record<Kind, string> = {
   announcement: 'Announcement',
