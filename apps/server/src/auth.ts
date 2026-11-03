@@ -36,7 +36,7 @@ export function newPassword(): string {
   return [0, 4, 8, 12].map((i) => chars.slice(i, i + 4).join('')).join('-');
 }
 
-const sha256 = (text: string) => createHash('sha256').update(text).digest('hex');
+export const sha256 = (text: string) => createHash('sha256').update(text).digest('hex');
 
 export interface Account {
   id: string;

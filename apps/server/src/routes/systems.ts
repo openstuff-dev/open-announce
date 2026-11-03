@@ -22,7 +22,8 @@ const origin = z
   });
 
 const COLUMNS = `id, slug, name, public_key AS "publicKey", left(signing_secret, 7) || '…' AS "secretHint",
-  allowed_origins AS "allowedOrigins", created_at AS "createdAt"`;
+  allowed_origins AS "allowedOrigins", created_at AS "createdAt",
+  CASE WHEN publish_key_last4 IS NULL THEN NULL ELSE 'ak_••••' || publish_key_last4 END AS "publishKeyHint"`;
 
 export function registerSystemRoutes(app: FastifyInstance, pool: Pool): void {
   app.get('/api/t/:tenant/systems', async (request): Promise<System[]> => {

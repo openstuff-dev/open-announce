@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import type { System, SystemWithSecret } from '@open-announce/contracts';
+import type { System, SystemWithPublishKey, SystemWithSecret } from '@open-announce/contracts';
 import {
   Button,
   Callout,
@@ -98,6 +98,33 @@ import { iconPlus } from '../shared/icons';
                 </button>
               </dd>
             </div>
+            <div>
+              <dt>Publish key</dt>
+              <dd>
+                @if (s.publishKeyHint) {
+                  <code>{{ s.publishKeyHint }}</code>
+                } @else {
+                  <span class="muted">None. Other systems can’t post here.</span>
+                }
+                @if (session.isAdmin()) {
+                  <button type="button" os-button size="sm" (click)="makePublishKey(s)">
+                    {{ s.publishKeyHint ? 'Replace publish key' : 'Make publish key' }}
+                  </button>
+                  @if (s.publishKeyHint) {
+                    <button
+                      type="button"
+                      os-button
+                      size="sm"
+                      variant="ghost"
+                      tone="danger"
+                      (click)="revokePublishKey(s)"
+                    >
+                      Revoke
+                    </button>
+                  }
+                }
+              </dd>
+            </div>
           </dl>
 
           <form class="origins" (ngSubmit)="saveOrigins(s)">
@@ -134,6 +161,14 @@ import { iconPlus } from '../shared/icons';
             <ng-template os-tab="backend" label="Backend">
               <pre><code>{{ snippets(s).backend }}</code></pre>
               <app-copy-button [text]="snippets(s).backend" what="backend code" />
+            </ng-template>
+            <ng-template os-tab="publish" label="Publish API">
+              <p class="tab-note">
+                Another system (OpenVersion, a CI job) posts News here with the publish key. Send an
+                Idempotency-Key, such as the id of what you announce, so a retry never posts twice.
+              </p>
+              <pre><code>{{ snippets(s).publish }}</code></pre>
+              <app-copy-button [text]="snippets(s).publish" what="publish example" />
             </ng-template>
           </os-tabs>
 
@@ -204,8 +239,36 @@ import { iconPlus } from '../shared/icons';
         <button os-button variant="primary" os-dialog-close type="button">I’ve copied it</button>
       </footer>
     </dialog>
+
+    <dialog os-dialog [(open)]="publishKeyOpen" closedby="none">
+      <header os-dialog-header><h2 os-dialog-title>Copy the publish key now</h2></header>
+      <div os-dialog-body class="stack">
+        @if (publishKey(); as s) {
+          <p>
+            This is the only time you see the whole publish key of {{ s.name }}. Paste it into the
+            system that posts here, for example OpenVersion’s OpenAnnounce integration.
+          </p>
+          <p class="secret">
+            <code>{{ s.publishKey }}</code
+            ><app-copy-button [text]="s.publishKey" what="publish key" />
+          </p>
+        }
+      </div>
+      <footer os-dialog-footer>
+        <button os-button variant="primary" os-dialog-close type="button">I’ve copied it</button>
+      </footer>
+    </dialog>
   `,
   styles: `
+    .tab-note {
+      max-inline-size: 65ch;
+      margin: 0 0 var(--os-space-3);
+    }
+
+    .muted {
+      color: var(--os-fg-muted);
+    }
+
     .system {
       display: grid;
       gap: var(--os-space-4);
@@ -305,6 +368,8 @@ export class Systems {
   private readonly key = new IdempotencyKey();
   protected readonly secretOpen = signal(false);
   protected readonly secret = signal<SystemWithSecret | null>(null);
+  protected readonly publishKeyOpen = signal(false);
+  protected readonly publishKey = signal<SystemWithPublishKey | null>(null);
 
   private readonly origin = computed(() => location.origin);
 
@@ -315,8 +380,13 @@ export class Systems {
     inject(DestroyRef).onDestroy(onReturn(() => void this.load(this.tenant())));
   }
 
-  protected snippets(s: System): Record<'install' | 'config' | 'page' | 'backend', string> {
+  protected snippets(s: System): Record<'install' | 'config' | 'page' | 'backend' | 'publish', string> {
     return {
+      publish: `curl -X POST ${this.origin()}/api/v1/messages \\
+  -H "Authorization: Bearer $OPENANNOUNCE_PUBLISH_KEY" \\
+  -H "Idempotency-Key: release-1.5.0" \\
+  -H "Content-Type: application/json" \\
+  -d '{"title": "${s.name} 1.5.0", "body": "- Gift wrapping at checkout", "groups": []}'`,
       install: 'npm install @openstuff-dev/announce',
       config: `// openannounce.config.js
 import { defineConfig } from '@openstuff-dev/announce';
@@ -395,6 +465,51 @@ const token = await signUser(process.env.OPENANNOUNCE_SECRET, {
       this.adopt((this.systems() ?? []).map((x) => (x.id === s.id ? rotated : x)));
       this.secret.set(rotated);
       this.secretOpen.set(true);
+    } catch (error) {
+      this.toaster.show(errorText(error), { tone: 'danger' });
+    }
+  }
+
+  protected async makePublishKey(s: System): Promise<void> {
+    if (s.publishKeyHint) {
+      const ok = await this.confirm.confirm({
+        title: `Replace the publish key of ${s.name}?`,
+        message: 'The current key stops working at once. Systems that post with it fail until they have the new one.',
+        confirmLabel: 'Replace publish key',
+        danger: true,
+      });
+      if (!ok) return;
+    }
+    try {
+      const made = await this.api.post<SystemWithPublishKey>(
+        `/api/t/${encodeURIComponent(this.tenant())}/systems/${s.id}/publish-key`,
+        {},
+      );
+      const { publishKey: _key, ...system } = made;
+      this.adopt((this.systems() ?? []).map((x) => (x.id === s.id ? system : x)));
+      this.publishKey.set(made);
+      this.publishKeyOpen.set(true);
+    } catch (error) {
+      this.toaster.show(errorText(error), { tone: 'danger' });
+    }
+  }
+
+  protected async revokePublishKey(s: System): Promise<void> {
+    const ok = await this.confirm.confirm({
+      title: `Revoke the publish key of ${s.name}?`,
+      message: 'Systems that post with it get an error from now on. Messages they already posted stay.',
+      confirmLabel: 'Revoke publish key',
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await this.api.delete(
+        `/api/t/${encodeURIComponent(this.tenant())}/systems/${s.id}/publish-key`,
+      );
+      this.adopt(
+        (this.systems() ?? []).map((x) => (x.id === s.id ? { ...x, publishKeyHint: null } : x)),
+      );
+      this.toaster.show('Revoked the publish key.', { tone: 'success' });
     } catch (error) {
       this.toaster.show(errorText(error), { tone: 'danger' });
     }

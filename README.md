@@ -101,6 +101,35 @@ The elements share one request per page. They reuse a fetched feed for `cacheTtl
 costs a 304. An open page checks every `refreshInterval` seconds (default 300). What a user
 closed is remembered in their browser until the message is edited.
 
+## Post from another system
+
+Other systems can post News to one system: a deploy tool posting release notes (like
+[OpenVersion](https://github.com/openstuff-dev/open-version)), or a CI job. An admin makes the
+system's **publish key** (`ak_…`) on the Systems page. It is shown once, stored only as a hash,
+and can be replaced or revoked there. It is separate from the signing secret.
+
+```sh
+curl -X POST https://announce.example.com/api/v1/messages \
+  -H "Authorization: Bearer $OPENANNOUNCE_PUBLISH_KEY" \
+  -H "Idempotency-Key: release-1.5.0" \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Shop 1.5.0", "body": "- Gift wrapping at checkout", "groups": ["staff"]}'
+```
+
+| Field | What it does |
+|---|---|
+| `title` | Required, up to 200 characters |
+| `body` | The text, up to 10,000 characters |
+| `groups` | Group slugs; leave out to post for everyone. An unknown slug is a 400 |
+| `publishAt` | When it shows (ISO 8601); leave out for now |
+| `link` | `{ "url": "https://…", "label": "Read more" }`, optional |
+
+The message is a published News item for the key's system only. `Idempotency-Key` is required:
+the same key posts once, ever. A retry gets the first message back with `200` and
+`Idempotent-Replayed: true`; the same key with a different message is a `422`.
+`GET /api/v1/publish-key` with the key answers which tenant and system it posts to, so a tool can
+test the key without posting.
+
 ## Settings
 
 | Variable | Default | What it does |
