@@ -43,6 +43,35 @@ export interface System {
   /** Origins that may read the feed, e.g. https://app.example.com. Empty: any origin. */
   allowedOrigins: string[];
   createdAt: string;
+  /** `ak_••••3f9a` when the system has a publish key, null otherwise. */
+  publishKeyHint: string | null;
+}
+
+/** Returned once, when a publish key is made or replaced. */
+export interface SystemWithPublishKey extends System {
+  publishKey: string;
+}
+
+/** What `POST /api/v1/messages` takes: a News message for the publish key's system. */
+export interface PublishMessage {
+  title: string;
+  /** Markdown, up to 10,000 characters. */
+  body?: string;
+  /** Group slugs; empty or left out: everyone. */
+  groups?: string[];
+  /** When it shows, ISO 8601. Left out: now. */
+  publishAt?: string;
+  link?: { url: string; label?: string };
+}
+
+/** What `POST /api/v1/messages` answers (201, or 200 for a replayed Idempotency-Key). */
+export interface PublishedMessage {
+  id: string;
+  kind: 'news';
+  title: string;
+  startsAt: string | null;
+  system: string;
+  groups: string[];
 }
 
 /** Returned once, when a system is made or its secret is replaced. */

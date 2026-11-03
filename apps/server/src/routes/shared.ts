@@ -23,3 +23,5 @@ export function slugify(text: string): string {
 
 export const newPublicKey = () => `pk_${randomBytes(18).toString('base64url')}`;
 export const newSigningSecret = () => `sk_${randomBytes(32).toString('base64url')}`;
+/** A publish key: lets another system post News to this one. Stored only as a hash. */
+export const newPublishKey = () => `ak_${randomBytes(30).toString('base64url')}`;

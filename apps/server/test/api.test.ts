@@ -4,7 +4,14 @@ import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { FeedMessage } from '@openstuff-dev/announce';
 import { signUser } from '@openstuff-dev/announce/server';
-import type { Message, MessagesPage, SystemWithSecret, TenantExport } from '@open-announce/contracts';
+import type {
+  Message,
+  MessagesPage,
+  PublishedMessage,
+  SystemWithPublishKey,
+  SystemWithSecret,
+  TenantExport,
+} from '@open-announce/contracts';
 import { buildApp } from '../src/app.js';
 import { hashPassword } from '../src/auth.js';
 import { loadConfig } from '../src/config.js';
@@ -280,9 +287,84 @@ describe.skipIf(!url)('API against Postgres', () => {
     });
   });
 
+  describe('publish API', () => {
+    let key = '';
+    let systemId = '';
+    const publish = (body: unknown, idempotencyKey?: string, token = key) =>
+      inject(null, 'POST', '/api/v1/messages', body, {
+        authorization: `Bearer ${token}`,
+        ...(idempotencyKey ? { 'idempotency-key': idempotencyKey } : {}),
+      });
+
+    beforeAll(async () => {
+      const systems = (await inject(admin, 'GET', '/api/t/demo/systems')).json<SystemWithSecret[]>();
+      systemId = must(systems.find((s) => s.slug === 'demo-app'), 'demo system').id;
+    });
+
+    it('lets only admins make a publish key, and shows it once', async () => {
+      expect((await inject(developer, 'POST', `/api/t/demo/systems/${systemId}/publish-key`)).statusCode).toBe(403);
+      const made = await inject(admin, 'POST', `/api/t/demo/systems/${systemId}/publish-key`);
+      expect(made.statusCode).toBe(200);
+      const body = made.json<SystemWithPublishKey>();
+      key = body.publishKey;
+      expect(key).toMatch(/^ak_/);
+      expect(body.publishKeyHint).toBe(`ak_••••${key.slice(-4)}`);
+      const listed = (await inject(admin, 'GET', '/api/t/demo/systems')).json<SystemWithSecret[]>();
+      expect(JSON.stringify(listed)).not.toContain(key);
+      const { rows } = await withScope(pool, { bypass: true }, (db) =>
+        db.query<{ hash: string }>('SELECT publish_key_hash AS hash FROM systems WHERE id = $1', [systemId]),
+      );
+      expect(rows[0].hash).not.toContain(key);
+    });
+
+    it('tells another system which system a key posts to', async () => {
+      const who = await inject(null, 'GET', '/api/v1/publish-key', undefined, { authorization: `Bearer ${key}` });
+      expect(who.json()).toMatchObject({
+        tenant: { slug: 'demo', name: 'Demo company' },
+        system: { slug: 'demo-app' },
+      });
+      expect((await inject(null, 'GET', '/api/v1/publish-key')).statusCode).toBe(401);
+    });
+
+    it('posts News to the key’s system, exactly once per Idempotency-Key', async () => {
+      const message = { title: 'Shop 1.5.0', body: '- Gift wrapping', groups: ['staff'] };
+      expect((await publish(message)).statusCode).toBe(400);
+      const first = await publish(message, 'release-r1');
+      expect(first.statusCode).toBe(201);
+      const posted = first.json<PublishedMessage>();
+      expect(posted).toMatchObject({ kind: 'news', title: 'Shop 1.5.0', system: 'demo-app', groups: ['staff'] });
+      const retry = await publish(message, 'release-r1');
+      expect(retry.statusCode).toBe(200);
+      expect(retry.headers['idempotent-replayed']).toBe('true');
+      expect(retry.json<PublishedMessage>().id).toBe(posted.id);
+      // Concurrent retries still post once.
+      await Promise.all([publish(message, 'release-r2'), publish(message, 'release-r2'), publish(message, 'release-r2')]);
+      const { rows } = await withScope(pool, { bypass: true }, (db) =>
+        db.query<{ n: number }>(`SELECT count(*)::int AS n FROM messages WHERE title = 'Shop 1.5.0'`),
+      );
+      expect(rows[0].n).toBe(2);
+      expect((await publish({ ...message, title: 'Other' }, 'release-r1')).statusCode).toBe(422);
+      const page = (await inject(admin, 'GET', '/api/t/demo/messages')).json<MessagesPage>();
+      const saved = must(page.messages.find((m) => m.id === posted.id));
+      expect(saved).toMatchObject({ kind: 'news', display: 'sidebar', status: 'published', systemIds: [systemId] });
+    });
+
+    it('refuses unknown groups and keys, and stops working once revoked', async () => {
+      const unknown = await publish({ title: 'X', groups: ['nope'] }, 'release-r3');
+      expect(unknown.statusCode).toBe(400);
+      expect(unknown.json<{ error: string }>().error).toContain('nope');
+      // A refused request doesn't use up its key.
+      expect((await publish({ title: 'X' }, 'release-r3')).statusCode).toBe(201);
+      expect((await publish({ title: 'X' }, 'k', 'ak_00000000000000000000000000')).statusCode).toBe(401);
+      expect((await inject(admin, 'DELETE', `/api/t/demo/systems/${systemId}/publish-key`)).statusCode).toBe(200);
+      expect((await publish({ title: 'X' }, 'release-r4')).statusCode).toBe(401);
+    });
+  });
+
   it('exports a tenant and imports it into another', async () => {
     const exported = (await inject(admin, 'GET', '/api/t/demo/export')).json<TenantExport>();
     expect(JSON.stringify(exported)).not.toContain('sk_');
+    expect(JSON.stringify(exported)).not.toContain('ak_');
     await inject(admin, 'POST', '/api/tenants', { name: 'Copy', slug: 'copy' });
     const imported = await inject(admin, 'POST', '/api/t/copy/import', exported);
     expect(imported.statusCode).toBe(200);
