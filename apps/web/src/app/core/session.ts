@@ -10,10 +10,12 @@ export class Session {
   /** The tenant in the URL. Set by the shell. */
   readonly tenant = signal<string | null>(null);
 
-  readonly role = computed<Role | null>(() => {
+  readonly membership = computed(() => {
     const slug = this.tenant();
-    return this.me()?.tenants.find((t) => t.slug === slug)?.role ?? null;
+    return this.me()?.tenants.find((t) => t.slug === slug) ?? null;
   });
+
+  readonly role = computed<Role | null>(() => this.membership()?.role ?? null);
 
   readonly isAdmin = computed(() => this.role() === 'admin');
 
