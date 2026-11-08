@@ -1,3 +1,4 @@
+import type { FetchPolicy } from '@openstuff-dev/server';
 /** Settings from environment variables. Each has a default, so the server starts without any. */
 export interface Config {
   port: number;
@@ -20,6 +21,14 @@ export interface Config {
   demo: boolean;
   /** Where the built @openstuff-dev/announce is, for the demo page. */
   sdkDir: string | undefined;
+  /**
+   * A server-wide OpenVersion connection from the environment. When the URL and public key are
+   * both set, they win over the one saved in the Integrations tab, which then shows read-only.
+   */
+  openVersion: { url: string | undefined; publicKey: string | undefined };
+  /** Integrations fetch only public addresses unless this is `private`. */
+  fetch: 'public' | 'private';
+  fetchAllow: string[];
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -38,5 +47,21 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     trustProxy: trust === 'true' ? true : trust || false,
     demo: env.OPENANNOUNCE_DEMO === 'on',
     sdkDir: env.OPENANNOUNCE_SDK_DIR || undefined,
+    openVersion: {
+      url: env.OPENANNOUNCE_OPENVERSION_URL?.replace(/\/$/, '') || undefined,
+      publicKey: env.OPENANNOUNCE_OPENVERSION_PUBLIC_KEY || undefined,
+    },
+    fetch: env.OPENANNOUNCE_FETCH === 'private' ? 'private' : 'public',
+    fetchAllow: (env.OPENANNOUNCE_FETCH_ALLOW ?? '')
+      .split(',')
+      .map((host) => host.trim().toLowerCase())
+      .filter(Boolean),
   };
 }
+
+/** The fetch policy integrations use, from OPENANNOUNCE_FETCH and OPENANNOUNCE_FETCH_ALLOW. */
+export const policyFrom = (config: Config): FetchPolicy => ({
+  mode: config.fetch,
+  allow: config.fetchAllow,
+  envPrefix: 'OPENANNOUNCE',
+});

@@ -25,3 +25,18 @@ export const newPublicKey = () => `pk_${randomBytes(18).toString('base64url')}`;
 export const newSigningSecret = () => `sk_${randomBytes(32).toString('base64url')}`;
 /** A publish key: lets another system post News to this one. Stored only as a hash. */
 export const newPublishKey = () => `ak_${randomBytes(30).toString('base64url')}`;
+
+/** An http(s) URL, without a trailing slash. */
+export const baseUrl = z
+  .string()
+  .trim()
+  .transform((value, ctx) => {
+    try {
+      const url = new URL(value);
+      if (url.protocol === 'http:' || url.protocol === 'https:') return url.href.replace(/\/$/, '');
+    } catch {
+      // Falls through to the issue below.
+    }
+    ctx.addIssue({ code: 'custom', message: `"${value}" isn’t a URL like https://versions.example.com.` });
+    return z.NEVER;
+  });

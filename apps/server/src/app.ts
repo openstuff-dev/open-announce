@@ -13,6 +13,7 @@ import { registerDemo } from './routes/demo.js';
 import { registerFeedRoutes } from './routes/feed.js';
 import { registerMessageRoutes } from './routes/messages.js';
 import { registerPublishRoutes } from './routes/publish.js';
+import { registerServerIntegrationRoutes } from './routes/server-integrations.js';
 import { registerSystemRoutes } from './routes/systems.js';
 import { registerTenantRoutes } from './routes/tenants.js';
 import { registerTransferRoutes } from './routes/transfer.js';
@@ -36,6 +37,7 @@ export async function buildApp(config: Config, pool: Pool): Promise<FastifyInsta
   registerPublishRoutes(app, pool);
   registerTransferRoutes(app, pool);
   registerFeedRoutes(app, pool, config);
+  registerServerIntegrationRoutes(app, pool, config);
   // The built @openstuff-dev/announce, so a host can load it from here instead of npm, and the
   // admin app's previews use the same code the hosts run.
   await app.register(fastifyStatic, {
