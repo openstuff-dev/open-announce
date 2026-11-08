@@ -43,7 +43,10 @@ describe('a file that is missing', () => {
   it('answers 404, not the web app, and unknown pages still get the web app', async () => {
     const webDir = mkdtempSync(join(tmpdir(), 'web-'));
     writeFileSync(join(webDir, 'index.html'), '<!doctype html><title>app</title>');
-    const pool = { query: () => Promise.resolve({ rows: [] }) } as unknown as Pool;
+    // The vault's upsert always returns its row, so the fake answers the same way.
+    const pool = {
+      query: () => Promise.resolve({ rows: [{ value: 'test-secret-key', inserted: false }] }),
+    } as unknown as Pool;
     const app = await buildApp({ ...loadConfig({}), webDir, logLevel: 'silent' }, pool);
     try {
       const chunk = await app.inject({ url: '/chunk-missing.js?v=1' });

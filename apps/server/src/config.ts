@@ -27,7 +27,13 @@ export interface Config {
    * A server-wide OpenVersion connection from the environment. When the URL and public key are
    * both set, they win over the one saved in the Integrations tab, which then shows read-only.
    */
-  openVersion: { url: string | undefined; publicKey: string | undefined };
+  openVersion: {
+    url: string | undefined;
+    publicKey: string | undefined;
+    deployToken: string | undefined;
+  };
+  /** Encrypts integration secrets. Without it, a key is made and kept in the database. */
+  secretKey: string | undefined;
   /** Integrations fetch only public addresses unless this is `private`. */
   fetch: 'public' | 'private';
   fetchAllow: string[];
@@ -53,7 +59,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     openVersion: {
       url: env.OPENANNOUNCE_OPENVERSION_URL?.replace(/\/$/, '') || undefined,
       publicKey: env.OPENANNOUNCE_OPENVERSION_PUBLIC_KEY || undefined,
+      deployToken: env.OPENANNOUNCE_OPENVERSION_DEPLOY_TOKEN || undefined,
     },
+    secretKey: env.OPENANNOUNCE_SECRET_KEY || undefined,
     fetch: env.OPENANNOUNCE_FETCH === 'private' ? 'private' : 'public',
     fetchAllow: (env.OPENANNOUNCE_FETCH_ALLOW ?? '')
       .split(',')
