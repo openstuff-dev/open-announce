@@ -145,6 +145,10 @@ test the key without posting.
 | `OPENANNOUNCE_FEED_MAX_AGE` | `60` | How long browsers may reuse a feed, in seconds (`Cache-Control: private, max-age`). |
 | `OPENANNOUNCE_TRUST_PROXY` | _(off)_ | Behind a reverse proxy: `true`, or the proxy's addresses, so rate limits see real client addresses. |
 | `OPENANNOUNCE_DEMO` | `off` | `on` serves the demo host page at `/demo`. |
+| `OPENANNOUNCE_FETCH` | `public` | `private` lets integrations reach internal addresses, such as an OpenVersion on the same network. |
+| `OPENANNOUNCE_FETCH_ALLOW` | _(none)_ | With `private`: the only hosts allowed to be internal, comma-separated. |
+| `OPENANNOUNCE_OPENVERSION_URL` | _(none)_ | Server-wide OpenVersion address, e.g. `https://versions.example.com`. With the public key below, it wins over the Integrations tab, which then shows it read-only. |
+| `OPENANNOUNCE_OPENVERSION_PUBLIC_KEY` | _(none)_ | The public key of an OpenVersion environment (`pk_…`). Safe to share. Add this server's address to that environment's allowed origins. |
 
 **Security.** The database user may be a superuser (the Docker default): every connection drops
 to the `openannounce_app` role, which row-level security applies to. If it can't, the server
