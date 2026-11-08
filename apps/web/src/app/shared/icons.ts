@@ -10,7 +10,9 @@ export {
   Menu as iconMenu,
   Plus as iconPlus,
   Server as iconSystems,
+  SunMoon as iconAppearance,
   Settings as iconSettings,
   UserCog as iconMembers,
+  UserRound as iconAccount,
   Users as iconAudience,
 } from 'lucide';

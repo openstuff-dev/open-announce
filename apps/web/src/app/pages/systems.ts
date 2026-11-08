@@ -16,6 +16,7 @@ import {
   Field,
   Icon,
   PageHeader,
+  SecretDialog,
   Skeleton,
   Tab,
   Tabs,
@@ -220,44 +221,6 @@ import { iconPlus } from '../shared/icons';
         </button>
       </footer>
     </dialog>
-
-    <dialog os-dialog [(open)]="secretOpen" closedby="none">
-      <header os-dialog-header><h2 os-dialog-title>Copy the secret now</h2></header>
-      <div os-dialog-body class="stack">
-        @if (secret(); as s) {
-          <p>
-            This is the only time you see the whole secret of {{ s.name }}. Put it in your backend’s
-            settings, for example as <code>OPENANNOUNCE_SECRET</code>. Never put it in browser code.
-          </p>
-          <p class="secret">
-            <code>{{ s.signingSecret }}</code
-            ><app-copy-button [text]="s.signingSecret" what="secret" />
-          </p>
-        }
-      </div>
-      <footer os-dialog-footer>
-        <button os-button variant="primary" os-dialog-close type="button">I’ve copied it</button>
-      </footer>
-    </dialog>
-
-    <dialog os-dialog [(open)]="publishKeyOpen" closedby="none">
-      <header os-dialog-header><h2 os-dialog-title>Copy the publish key now</h2></header>
-      <div os-dialog-body class="stack">
-        @if (publishKey(); as s) {
-          <p>
-            This is the only time you see the whole publish key of {{ s.name }}. Paste it into the
-            system that posts here, for example OpenVersion’s OpenAnnounce integration.
-          </p>
-          <p class="secret">
-            <code>{{ s.publishKey }}</code
-            ><app-copy-button [text]="s.publishKey" what="publish key" />
-          </p>
-        }
-      </div>
-      <footer os-dialog-footer>
-        <button os-button variant="primary" os-dialog-close type="button">I’ve copied it</button>
-      </footer>
-    </dialog>
   `,
   styles: `
     .tab-note {
@@ -309,8 +272,7 @@ import { iconPlus } from '../shared/icons';
       font-size: var(--os-text-sm);
     }
 
-    dd,
-    .secret {
+    dd {
       display: flex;
       flex-wrap: wrap;
       gap: var(--os-space-2);
@@ -353,6 +315,7 @@ export class Systems {
   private readonly api = inject(Api);
   private readonly toaster = inject(Toaster);
   private readonly confirm = inject(ConfirmDialog);
+  private readonly secrets = inject(SecretDialog);
   protected readonly iconPlus = iconPlus;
   protected readonly systems = signal<System[] | null>(null);
   protected readonly error = signal<string | null>(null);
@@ -366,10 +329,6 @@ export class Systems {
   protected readonly createError = signal<string | null>(null);
   protected newName = '';
   private readonly key = new IdempotencyKey();
-  protected readonly secretOpen = signal(false);
-  protected readonly secret = signal<SystemWithSecret | null>(null);
-  protected readonly publishKeyOpen = signal(false);
-  protected readonly publishKey = signal<SystemWithPublishKey | null>(null);
 
   private readonly origin = computed(() => location.origin);
 
@@ -440,8 +399,12 @@ const token = await signUser(process.env.OPENANNOUNCE_SECRET, {
       this.key.renew();
       this.createOpen.set(false);
       this.adopt([...(this.systems() ?? []), created]);
-      this.secret.set(created);
-      this.secretOpen.set(true);
+      await this.secrets.show({
+        title: `Secret of ${created.name}`,
+        secret: created.signingSecret,
+        what: 'secret',
+        instructions: 'Put it in your backend’s settings, for example as OPENANNOUNCE_SECRET. Never put it in browser code.',
+      });
     } catch (error) {
       this.createError.set(errorText(error));
     } finally {
@@ -463,8 +426,12 @@ const token = await signUser(process.env.OPENANNOUNCE_SECRET, {
         {},
       );
       this.adopt((this.systems() ?? []).map((x) => (x.id === s.id ? rotated : x)));
-      this.secret.set(rotated);
-      this.secretOpen.set(true);
+      await this.secrets.show({
+        title: `New secret for ${rotated.name}`,
+        secret: rotated.signingSecret,
+        what: 'secret',
+        instructions: 'Put it in your backend’s settings, for example as OPENANNOUNCE_SECRET. Never put it in browser code.',
+      });
     } catch (error) {
       this.toaster.show(errorText(error), { tone: 'danger' });
     }
@@ -487,8 +454,12 @@ const token = await signUser(process.env.OPENANNOUNCE_SECRET, {
       );
       const { publishKey: _key, ...system } = made;
       this.adopt((this.systems() ?? []).map((x) => (x.id === s.id ? system : x)));
-      this.publishKey.set(made);
-      this.publishKeyOpen.set(true);
+      await this.secrets.show({
+        title: `Publish key for ${made.name}`,
+        secret: made.publishKey,
+        what: 'publish key',
+        instructions: 'Paste it into the system that posts here, for example OpenVersion’s OpenAnnounce integration.',
+      });
     } catch (error) {
       this.toaster.show(errorText(error), { tone: 'danger' });
     }

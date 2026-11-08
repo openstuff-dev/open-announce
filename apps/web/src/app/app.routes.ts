@@ -11,9 +11,6 @@ const signedIn: CanActivateFn = async (_route, state) => {
   return me ? true : inject(Router).createUrlTree(['/sign-in'], { queryParams: { next: state.url } });
 };
 
-const serverAdmin: CanActivateFn = () =>
-  inject(Session).me()?.isServerAdmin ? true : inject(Router).createUrlTree(['/']);
-
 export const routes: Routes = [
   { path: 'sign-in', component: SignIn, title: 'Sign in · OpenAnnounce' },
   {
@@ -22,16 +19,13 @@ export const routes: Routes = [
     canActivate: [signedIn],
     children: [
       { path: '', component: Start, title: 'OpenAnnounce' },
+      // Old address: Tenants moved into Settings.
+      { path: 'tenants', redirectTo: 'settings/tenants', pathMatch: 'full' },
+      { path: 'settings', redirectTo: 'settings/account', pathMatch: 'full' },
       {
-        path: 'settings',
-        loadComponent: () => import('./pages/settings').then((m) => m.Settings),
+        path: 'settings/:tab',
+        loadComponent: () => import('./pages/settings/settings').then((m) => m.SettingsPage),
         title: 'Settings · OpenAnnounce',
-      },
-      {
-        path: 'tenants',
-        canActivate: [serverAdmin],
-        loadComponent: () => import('./pages/tenants').then((m) => m.Tenants),
-        title: 'Tenants · OpenAnnounce',
       },
       {
         path: 't/:tenant',
@@ -52,15 +46,14 @@ export const routes: Routes = [
             loadComponent: () => import('./pages/audience').then((m) => m.Audience),
             title: 'Groups and users · OpenAnnounce',
           },
+          // Old addresses: these moved into Settings.
+          { path: 'members', redirectTo: 'settings/members', pathMatch: 'full' },
+          { path: 'data', redirectTo: 'settings/data', pathMatch: 'full' },
+          { path: 'settings', redirectTo: 'settings/account', pathMatch: 'full' },
           {
-            path: 'members',
-            loadComponent: () => import('./pages/members').then((m) => m.Members),
-            title: 'Members · OpenAnnounce',
-          },
-          {
-            path: 'data',
-            loadComponent: () => import('./pages/data').then((m) => m.Data),
-            title: 'Export and import · OpenAnnounce',
+            path: 'settings/:tab',
+            loadComponent: () => import('./pages/settings/settings').then((m) => m.SettingsPage),
+            title: 'Settings · OpenAnnounce',
           },
         ],
       },

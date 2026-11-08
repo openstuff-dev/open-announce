@@ -16,8 +16,6 @@ import {
   iconAudience,
   iconCheck,
   iconChevrons,
-  iconData,
-  iconMembers,
   iconMenu,
   iconMessages,
   iconSettings,
@@ -40,8 +38,6 @@ const LINKS: NavLink[] = [
   { path: 'messages', label: 'Messages', icon: iconMessages, roles: ['admin', 'developer'] },
   { path: 'systems', label: 'Systems', icon: iconSystems, roles: ['admin', 'developer'] },
   { path: 'audience', label: 'Groups and users', icon: iconAudience, roles: ['admin'] },
-  { path: 'members', label: 'Members', icon: iconMembers, roles: ['admin'] },
-  { path: 'data', label: 'Export and import', icon: iconData, roles: ['admin'] },
 ];
 
 /** "Demo Tenant" → "DT", "Acme" → "AC". */
@@ -130,7 +126,7 @@ export function initials(name: string): string {
                 }
                 @if (me.isServerAdmin) {
                   <hr os-menu-separator />
-                  <a os-menu-item routerLink="/tenants">
+                  <a os-menu-item routerLink="/settings/tenants">
                     <svg os-icon [icon]="icons.tenants" size="sm"></svg>Manage tenants
                   </a>
                 }
@@ -158,7 +154,11 @@ export function initials(name: string): string {
         <div class="rail-foot">
           <ul>
             <li>
-              <a routerLink="/settings" routerLinkActive="active" ariaCurrentWhenActive="page">
+              <a
+                [routerLink]="settingsLink()"
+                routerLinkActive="active"
+                ariaCurrentWhenActive="page"
+              >
                 <svg os-icon [icon]="icons.settings" size="sm"></svg>Settings
               </a>
             </li>
@@ -432,6 +432,12 @@ export class Shell {
     signOut: iconSignOut,
     tenants: iconTenants,
   };
+
+  /** Settings of the tenant in view, or the server's when none is. */
+  protected readonly settingsLink = computed(() => {
+    const t = this.tenant();
+    return t ? ['/t', t, 'settings'] : ['/settings'];
+  });
 
   protected readonly links = computed(() => {
     const role = this.session.role();

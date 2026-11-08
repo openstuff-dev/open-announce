@@ -1,4 +1,15 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, input, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  type ElementRef,
+  computed,
+  effect,
+  inject,
+  input,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import type { Member, NewMember, Role } from '@open-announce/contracts';
 import {
@@ -8,16 +19,19 @@ import {
   ConfirmDialog,
   Control,
   DataTable,
+  EmptyState,
   Field,
-  PageHeader,
+  SecretDialog,
+  SectionHeader,
+  SettingCard,
+  SettingCardFooter,
   Skeleton,
   Toaster,
 } from '@openstuff-dev/ui-angular';
-import { Api, errorText } from '../core/api';
-import { IdempotencyKey } from '../core/idempotency';
-import { onReturn, slowLoading } from '../core/loading';
-import { Session } from '../core/session';
-import { CopyButton } from '../shared/copy-button';
+import { Api, errorText } from '../../core/api';
+import { IdempotencyKey } from '../../core/idempotency';
+import { onReturn, slowLoading } from '../../core/loading';
+import { Session } from '../../core/session';
 
 /** Who manages this tenant: admins do everything, developers set up systems. */
 @Component({
@@ -28,17 +42,19 @@ import { CopyButton } from '../shared/copy-button';
     Callout,
     Cell,
     Control,
-    CopyButton,
     DataTable,
+    EmptyState,
     Field,
-    PageHeader,
+    SectionHeader,
+    SettingCard,
+    SettingCardFooter,
     Skeleton,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'stack' },
   template: `
     <header
-      os-page-header
+      os-section-header
       title="Members"
       description="Admins write messages and manage everything. Developers set up systems and their keys."
     ></header>
@@ -47,29 +63,35 @@ import { CopyButton } from '../shared/copy-button';
       <os-callout tone="danger" title="The members didn’t load">{{ error }}</os-callout>
     }
 
-    <form class="inline" (ngSubmit)="add()">
-      <os-field label="Email" [error]="addError()">
-        <input os-input type="email" name="email" required [(ngModel)]="email" />
-      </os-field>
-      <os-field label="Role">
-        <select os-select name="role" [(ngModel)]="role">
-          <option value="developer">Developer</option>
-          <option value="admin">Admin</option>
-        </select>
-      </os-field>
-      <button os-button type="submit" [loading]="adding()">Add member</button>
+    <form
+      os-setting-card
+      title="Add a member"
+      description="They get a password, shown once, for you to pass on."
+      (ngSubmit)="add()"
+    >
+      <div class="fields">
+        <os-field label="Email" [error]="addError()">
+          <input #emailInput os-input type="email" name="email" required [(ngModel)]="email" />
+        </os-field>
+        <os-field label="Role">
+          <select os-select name="role" [(ngModel)]="role">
+            <option value="developer">Developer</option>
+            <option value="admin">Admin</option>
+          </select>
+        </os-field>
+      </div>
+      <div os-setting-card-footer>
+        <button os-button variant="primary" type="submit" [loading]="adding()">Add member</button>
+      </div>
     </form>
 
-    @if (newPassword(); as added) {
-      <os-callout tone="info" title="Send {{ added.email }} their password">
-        <p>
-          This is the only time it’s shown: <code>{{ added.password }}</code>
-          <app-copy-button [text]="added.password ?? ''" what="password" />
-        </p>
-      </os-callout>
-    }
-
     @if (members(); as members) {
+      @if (onlyYou()) {
+        <os-empty-state title="Only you so far">
+          <p>Add a developer to set up your systems. They get a password to sign in with.</p>
+          <div><button os-button type="button" (click)="focusEmail()">Add a developer</button></div>
+        </os-empty-state>
+      }
       <os-data-table
         caption="Members"
         [columns]="columns"
@@ -117,7 +139,7 @@ import { CopyButton } from '../shared/copy-button';
     }
   `,
   styles: `
-    .inline {
+    .fields {
       display: flex;
       flex-wrap: wrap;
       gap: var(--os-space-3);
@@ -130,7 +152,9 @@ export class Members {
   private readonly api = inject(Api);
   private readonly toaster = inject(Toaster);
   private readonly confirm = inject(ConfirmDialog);
+  private readonly secret = inject(SecretDialog);
   private readonly session = inject(Session);
+  private readonly emailInput = viewChild<ElementRef<HTMLInputElement>>('emailInput');
   protected readonly me = () => this.session.me()?.id;
   protected readonly members = signal<Member[] | null>(null);
   protected readonly error = signal<string | null>(null);
@@ -141,13 +165,18 @@ export class Members {
     { key: 'actions' as const, label: 'Actions', align: 'end' as const },
   ];
 
+  /** True when you're the only member, so the empty state invites the first developer. */
+  protected readonly onlyYou = computed(() => {
+    const list = this.members();
+    return list?.every((m) => m.accountId === this.me()) ?? false;
+  });
+
   /** DataTable shows row properties; the actions column needs one too. */
   protected rows = (members: Member[]) => members.map((m) => ({ ...m, actions: '' }));
   protected email = '';
   protected role: Role = 'developer';
   protected readonly adding = signal(false);
   protected readonly addError = signal<string | null>(null);
-  protected readonly newPassword = signal<NewMember | null>(null);
   private readonly key = new IdempotencyKey();
 
   constructor() {
@@ -161,18 +190,29 @@ export class Members {
     return `/api/t/${encodeURIComponent(this.tenant())}/members`;
   }
 
+  protected focusEmail(): void {
+    this.emailInput()?.nativeElement.focus();
+  }
+
   protected async add(): Promise<void> {
     this.adding.set(true);
     this.addError.set(null);
-    this.newPassword.set(null);
     try {
       const body = { email: this.email, role: this.role };
       const added = await this.api.post<NewMember>(this.base, body, this.key.value);
       this.key.renew();
       this.email = '';
       this.members.update((m) => (m ? [...m, added] : m));
-      if (added.password) this.newPassword.set(added);
-      else this.toaster.show(`Added ${added.email}. They sign in with the password they have.`, { tone: 'success' });
+      if (added.password) {
+        await this.secret.show({
+          title: `Password for ${added.email}`,
+          secret: added.password,
+          what: 'password',
+          instructions: 'Give it to them. They can change it under Settings › Account.',
+        });
+      } else {
+        this.toaster.show(`Added ${added.email}. They sign in with the password they have.`, { tone: 'success' });
+      }
     } catch (error) {
       this.addError.set(errorText(error));
     } finally {
