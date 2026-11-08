@@ -2,12 +2,23 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import type { Tenant } from '@open-announce/contracts';
-import { Button, Callout, Cell, Control, DataTable, Field, PageHeader, Skeleton } from '@openstuff-dev/ui-angular';
-import { Api, errorText } from '../core/api';
-import { IdempotencyKey } from '../core/idempotency';
-import { slowLoading } from '../core/loading';
-import { Session } from '../core/session';
-import { shortDate } from '../shared/labels';
+import {
+  Button,
+  Callout,
+  Cell,
+  Control,
+  DataTable,
+  Field,
+  SectionHeader,
+  SettingCard,
+  SettingCardFooter,
+  Skeleton,
+} from '@openstuff-dev/ui-angular';
+import { Api, errorText } from '../../core/api';
+import { IdempotencyKey } from '../../core/idempotency';
+import { slowLoading } from '../../core/loading';
+import { Session } from '../../core/session';
+import { shortDate } from '../../shared/labels';
 
 /** For server admins: every tenant on this server. */
 @Component({
@@ -21,20 +32,27 @@ import { shortDate } from '../shared/labels';
     Control,
     DataTable,
     Field,
-    PageHeader,
+    SectionHeader,
+    SettingCard,
+    SettingCardFooter,
     Skeleton,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'stack' },
   template: `
     <header
-      os-page-header
+      os-section-header
       title="Tenants"
       description="Each tenant is a company or division with its own systems, groups, messages and members."
     ></header>
 
-    <form class="inline" (ngSubmit)="create()">
-      <os-field label="New tenant" [error]="createError()">
+    <form
+      os-setting-card
+      title="Add a tenant"
+      description="Make a tenant for a company or division."
+      (ngSubmit)="create()"
+    >
+      <os-field label="Tenant name" [error]="createError()">
         <input
           os-input
           name="name"
@@ -44,7 +62,9 @@ import { shortDate } from '../shared/labels';
           [(ngModel)]="name"
         />
       </os-field>
-      <button os-button variant="primary" type="submit" [loading]="creating()">Add tenant</button>
+      <div os-setting-card-footer>
+        <button os-button variant="primary" type="submit" [loading]="creating()">Add tenant</button>
+      </div>
     </form>
 
     @if (error(); as error) {
@@ -62,22 +82,15 @@ import { shortDate } from '../shared/labels';
           <a [routerLink]="['/t', t.slug, 'messages']">{{ t.name }}</a>
           <span class="os-cell-sub">{{ t.slug }}</span>
         </ng-template>
-        <ng-template os-cell="createdAt" let-t
-          ><span class="nums">{{ date(t.createdAt) }}</span></ng-template
-        >
+        <ng-template os-cell="createdAt" let-t>
+          <span class="nums">{{ date(t.createdAt) }}</span>
+        </ng-template>
       </os-data-table>
     } @else if (loading.slow()) {
       <os-skeleton [lines]="4" />
     }
   `,
   styles: `
-    .inline {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--os-space-3);
-      align-items: end;
-    }
-
     .nums {
       font-variant-numeric: tabular-nums;
     }
@@ -123,7 +136,13 @@ export class Tenants {
   private async load(): Promise<void> {
     try {
       this.tenants.set(
-        await this.loading.track(this.api.get<Tenant[]>('/api/tenants', { onFresh: (t) => { this.tenants.set(t); } })),
+        await this.loading.track(
+          this.api.get<Tenant[]>('/api/tenants', {
+            onFresh: (t) => {
+              this.tenants.set(t);
+            },
+          }),
+        ),
       );
     } catch (error) {
       this.error.set(errorText(error));

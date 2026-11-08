@@ -14,7 +14,7 @@ import { Session } from '../core/session';
         <os-empty-state title="Make your first tenant" [level]="1">
           A tenant is a company or a division, with its own systems, groups and messages.
           <div os-actions>
-            <a os-button variant="primary" routerLink="/tenants">Make a tenant</a>
+            <a os-button variant="primary" routerLink="/settings/tenants">Make a tenant</a>
           </div>
         </os-empty-state>
       } @else {
