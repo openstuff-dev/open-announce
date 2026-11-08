@@ -287,6 +287,24 @@ describe.skipIf(!url)('API against Postgres', () => {
     });
   });
 
+  describe('server connections stay out of exports', () => {
+    it('leaves the saved OpenVersion connection out of a tenant export', async () => {
+      const connectionUrl = 'https://versions.example.com';
+      const connectionKey = 'pk_export_check_0123456789';
+      await pool.query(
+        `INSERT INTO server_integrations (kind, url, public_key) VALUES ('openversion', $1, $2)
+         ON CONFLICT (kind) DO UPDATE SET url = EXCLUDED.url, public_key = EXCLUDED.public_key`,
+        [connectionUrl, connectionKey],
+      );
+      const response = await inject(admin, 'GET', '/api/t/demo/export');
+      expect(response.statusCode).toBe(200);
+      expect(response.body).not.toContain(connectionUrl);
+      expect(response.body).not.toContain(connectionKey);
+      expect(response.body).not.toContain('server_integrations');
+      await pool.query("DELETE FROM server_integrations WHERE kind = 'openversion'");
+    });
+  });
+
   describe('publish API', () => {
     let key = '';
     let systemId = '';
