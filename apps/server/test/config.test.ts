@@ -71,3 +71,10 @@ describe('first admin', () => {
     expect(warn.mock.calls[0]?.[0]).not.toContain('top bar');
   });
 });
+
+describe('version', () => {
+  it('reads the release the image was built from, or unknown for a local build', () => {
+    expect(loadConfig({ VERSION: ' 1.4.0 ' }).appVersion).toBe('1.4.0');
+    expect(loadConfig({}).appVersion).toBe('unknown');
+  });
+});
