@@ -149,6 +149,8 @@ test the key without posting.
 | `OPENANNOUNCE_FETCH_ALLOW` | _(none)_ | With `private`: the only hosts allowed to be internal, comma-separated. |
 | `OPENANNOUNCE_OPENVERSION_URL` | _(none)_ | Server-wide OpenVersion address, e.g. `https://versions.example.com`. With the public key below, it wins over the Integrations tab, which then shows it read-only. |
 | `OPENANNOUNCE_OPENVERSION_PUBLIC_KEY` | _(none)_ | The public key of an OpenVersion environment (`pk_…`). Safe to share. Add this server's address to that environment's allowed origins. |
+| `OPENANNOUNCE_OPENVERSION_DEPLOY_TOKEN` | _(none)_ | Lets this server test the connection and publish its own version (`VERSION`) to OpenVersion on start. Keep it secret. Without it, nothing is published. |
+| `OPENANNOUNCE_SECRET_KEY` | _(none)_ | Encrypts the saved OpenVersion deploy token. Without it, a key is made and kept in the database, and a warning says so. Set it on a real server, so a database dump alone can't reveal the token. |
 
 **Security.** The database user may be a superuser (the Docker default): every connection drops
 to the `openannounce_app` role, which row-level security applies to. If it can't, the server

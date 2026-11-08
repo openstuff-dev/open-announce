@@ -1,4 +1,5 @@
 import Fastify, { type FastifyInstance } from 'fastify';
+import { vaultFor } from '@openstuff-dev/server';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { Account } from '../src/auth.js';
 import { type Config, loadConfig } from '../src/config.js';
@@ -17,6 +18,7 @@ const URL_ = 'https://versions.example.com';
 interface Stored {
   url: string;
   public_key: string;
+  deploy_token_sealed: string | null;
   last_test_ok: boolean | null;
   last_test_message: string | null;
   last_tested_at: Date | null;
@@ -28,10 +30,17 @@ function fakePool(): { pool: Pool; stored: () => Stored | undefined } {
   const run = (sql: string, params: unknown[]) => {
     if (/^\s*SELECT url, public_key/.test(sql)) return { rows: row ? [row] : [] };
     if (/^\s*INSERT INTO server_integrations/.test(sql)) {
-      const [url, publicKey, ok, message] = params as [string, string, boolean, string];
+      const [url, publicKey, sealed, ok, message] = params as [
+        string,
+        string,
+        string | null,
+        boolean,
+        string,
+      ];
       row = {
         url,
         public_key: publicKey,
+        deploy_token_sealed: sealed ?? row?.deploy_token_sealed ?? null,
         last_test_ok: ok,
         last_test_message: message,
         last_tested_at: new Date(),
@@ -66,6 +75,8 @@ function build(
   account: Account | null,
   check: (url: string, key: string, origin: string) => Promise<string>,
   env: Record<string, string> = {},
+  checkToken: (url: string, token: string) => Promise<string> = () =>
+    Promise.resolve('The deploy token works.'),
 ) {
   const { pool, stored } = fakePool();
   const app: FastifyInstance = Fastify();
@@ -75,7 +86,7 @@ function build(
     request.account = account;
     done();
   });
-  registerServerIntegrationRoutes(app, pool, config(env), check);
+  registerServerIntegrationRoutes(app, pool, config(env), vaultFor('test-secret'), check, checkToken);
   return { app, stored };
 }
 
@@ -168,6 +179,53 @@ describe('server-wide OpenVersion connection', () => {
     expect(stored()?.last_test_ok).toBe(true);
   });
 
+  it('stores the deploy token sealed, tests it, and never returns it', async () => {
+    const tokens: string[] = [];
+    const { app, stored } = build(admin, check, {}, (_url, token) => {
+      tokens.push(token);
+      return Promise.resolve('The deploy token works, so this server can publish its version.');
+    });
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/api/admin/integrations/openversion',
+      payload: { url: URL_, publicKey: KEY, deployToken: 'ov_live_secret_token' },
+    });
+    expect(tokens).toEqual(['ov_live_secret_token']);
+    expect(stored()?.deploy_token_sealed).toBeTruthy();
+    expect(stored()?.deploy_token_sealed).not.toContain('ov_live_secret_token');
+    expect(response.body).not.toContain('ov_live_secret_token');
+    expect(response.json()).toMatchObject({ hasDeployToken: true, status: 'connected' });
+  });
+
+  it('a deploy token OpenVersion refuses is a problem, and says so', async () => {
+    const { app } = build(admin, check, {}, () =>
+      Promise.reject(new ConnectionError('OpenVersion doesn’t recognise this deploy token.', false)),
+    );
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/api/admin/integrations/openversion',
+      payload: { url: URL_, publicKey: KEY, deployToken: 'ov_live_wrong_token' },
+    });
+    expect(response.json()).toMatchObject({ status: 'problem', message: expect.stringContaining('deploy token') as unknown });
+  });
+
+  it('saving again without a deploy token keeps the saved one', async () => {
+    const { app, stored } = build(admin, check);
+    await app.inject({
+      method: 'PUT',
+      url: '/api/admin/integrations/openversion',
+      payload: { url: URL_, publicKey: KEY, deployToken: 'ov_live_secret_token' },
+    });
+    const sealed = stored()?.deploy_token_sealed;
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/api/admin/integrations/openversion',
+      payload: { url: URL_, publicKey: KEY },
+    });
+    expect(stored()?.deploy_token_sealed).toBe(sealed);
+    expect(response.json()).toMatchObject({ hasDeployToken: true });
+  });
+
   it('the public client config carries the URL and key, never a secret', async () => {
     const { app } = build(developer, check);
     const empty = await app.inject({ method: 'GET', url: '/api/client-config' });
@@ -193,6 +251,7 @@ describe('server-wide OpenVersion connection', () => {
         kind: 'openversion',
         url: URL_,
         publicKey: KEY,
+        hasDeployToken: false,
         status: 'set-by-server',
         source: 'environment',
         message: null,

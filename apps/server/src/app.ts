@@ -3,8 +3,10 @@ import fastifyStatic from '@fastify/static';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Fastify, { type FastifyInstance } from 'fastify';
+import { loadVault } from '@openstuff-dev/server';
 import { registerAuth } from './auth.js';
 import type { Config } from './config.js';
+import { policyFrom } from './config.js';
 import type { Pool } from './db.js';
 import { registerErrorHandler } from './errors.js';
 import { registerIdempotency } from './idempotency.js';
@@ -17,6 +19,7 @@ import { registerServerIntegrationRoutes } from './routes/server-integrations.js
 import { registerSystemRoutes } from './routes/systems.js';
 import { registerTenantRoutes } from './routes/tenants.js';
 import { registerTransferRoutes } from './routes/transfer.js';
+import { connectionFor, publishOwnVersion } from './openversion.js';
 
 export async function buildApp(config: Config, pool: Pool): Promise<FastifyInstance> {
   const app = Fastify({ logger: { level: config.logLevel }, trustProxy: config.trustProxy });
@@ -37,7 +40,25 @@ export async function buildApp(config: Config, pool: Pool): Promise<FastifyInsta
   registerPublishRoutes(app, pool);
   registerTransferRoutes(app, pool);
   registerFeedRoutes(app, pool, config);
-  registerServerIntegrationRoutes(app, pool, config);
+  const vault = await loadVault(pool, {
+    secret: config.secretKey,
+    envName: 'OPENANNOUNCE_SECRET_KEY',
+    log: app.log,
+  });
+  registerServerIntegrationRoutes(app, pool, config, vault);
+  // After the server is listening, publish this image's version if OpenVersion is connected. Never
+  // blocks startup and never fails it: not awaited, so listening never waits for OpenVersion.
+  app.addHook('onListen', () => {
+    const publish = async () => {
+      const connection = await connectionFor(pool, config, vault);
+      if (connection) {
+        await publishOwnVersion(policyFrom(config), connection, config.appVersion, app.log);
+      }
+    };
+    publish().catch((error: unknown) => {
+      app.log.warn({ err: (error as Error).message }, 'Skipped publishing this version.');
+    });
+  });
   // The built @openstuff-dev/announce, so a host can load it from here instead of npm, and the
   // admin app's previews use the same code the hosts run.
   await app.register(fastifyStatic, {
