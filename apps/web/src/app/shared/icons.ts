@@ -1,5 +1,6 @@
 // The Lucide icons this app uses, in one place.
 export {
+  Blocks as iconIntegrations,
   Building2 as iconTenants,
   Check as iconCheck,
   ChevronsUpDown as iconChevrons,
