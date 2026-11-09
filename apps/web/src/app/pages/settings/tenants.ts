@@ -1,11 +1,12 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import type { Tenant } from '@open-announce/contracts';
 import {
   Button,
   Callout,
   Cell,
+  ConfirmDialog,
   Control,
   DataTable,
   Field,
@@ -13,6 +14,7 @@ import {
   SettingCard,
   SettingCardFooter,
   Skeleton,
+  Toaster,
 } from '@openstuff-dev/ui-angular';
 import { Api, errorText } from '../../core/api';
 import { IdempotencyKey } from '../../core/idempotency';
@@ -74,7 +76,7 @@ import { shortDate } from '../../shared/labels';
       <os-data-table
         caption="Tenants"
         [columns]="columns"
-        [rows]="tenants"
+        [rows]="rows(tenants)"
         rowKey="id"
         empty="No tenants yet."
       >
@@ -84,6 +86,19 @@ import { shortDate } from '../../shared/labels';
         </ng-template>
         <ng-template os-cell="createdAt" let-t>
           <span class="nums">{{ date(t.createdAt) }}</span>
+        </ng-template>
+        <ng-template os-cell="actions" let-t>
+          <button
+            type="button"
+            os-button
+            size="sm"
+            variant="ghost"
+            tone="danger"
+            [attr.aria-label]="'Delete ' + t.name"
+            (click)="remove(t)"
+          >
+            Delete
+          </button>
         </ng-template>
       </os-data-table>
     } @else if (loading.slow()) {
@@ -97,7 +112,12 @@ import { shortDate } from '../../shared/labels';
   `,
 })
 export class Tenants {
+  /** The tenant in the address, if any: deleting it leaves the page for Settings outside one. */
+  readonly tenant = input('');
   private readonly api = inject(Api);
+  private readonly router = inject(Router);
+  private readonly confirm = inject(ConfirmDialog);
+  private readonly toaster = inject(Toaster);
   private readonly session = inject(Session);
   protected readonly tenants = signal<Tenant[] | null>(null);
   protected readonly error = signal<string | null>(null);
@@ -105,9 +125,11 @@ export class Tenants {
   protected readonly columns = [
     { key: 'name' as const, label: 'Tenant' },
     { key: 'createdAt' as const, label: 'Added' },
+    { key: 'actions' as const, label: 'Actions', align: 'end' as const },
   ];
 
   protected readonly date = shortDate;
+  protected readonly rows = (tenants: Tenant[]) => tenants.map((t) => ({ ...t, actions: '' }));
   protected name = '';
   protected readonly creating = signal(false);
   protected readonly createError = signal<string | null>(null);
@@ -130,6 +152,27 @@ export class Tenants {
       this.createError.set(errorText(error));
     } finally {
       this.creating.set(false);
+    }
+  }
+
+  protected async remove(tenant: Tenant): Promise<void> {
+    const ok = await this.confirm.confirm({
+      title: `Delete ${tenant.name}?`,
+      message:
+        'Its systems, messages, groups and users are deleted, and apps using its keys stop showing messages at once. ' +
+        'This can’t be undone. Member accounts stay, with their other tenants.',
+      confirmLabel: 'Delete tenant',
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await this.api.delete(`/api/t/${encodeURIComponent(tenant.slug)}`);
+      this.tenants.update((list) => list?.filter((t) => t.id !== tenant.id) ?? null);
+      this.toaster.show(`Deleted ${tenant.name}.`, { tone: 'success' });
+      await this.session.load();
+      if (tenant.slug === this.tenant()) await this.router.navigate(['/settings', 'tenants']);
+    } catch (error) {
+      this.toaster.show(errorText(error), { tone: 'danger' });
     }
   }
 
