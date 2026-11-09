@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
-  // Types only; the server and web app test how they're used.
+  // Shared types, and the connection string helper the web app uses.
   test: { include: ['test/**/*.test.ts'], passWithNoTests: true },
 });

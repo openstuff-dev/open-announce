@@ -1,9 +1,16 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import type { System, SystemWithPublishKey, SystemWithSecret } from '@open-announce/contracts';
+import {
+  type Connection,
+  connectionFor,
+  type System,
+  type SystemWithPublishKey,
+  type SystemWithSecret,
+} from '@open-announce/contracts';
 import {
   Button,
   Callout,
+  CodeBlock,
   ConfirmDialog,
   Control,
   Dialog,
@@ -39,6 +46,7 @@ import { iconPlus } from '../shared/icons';
     FormsModule,
     Button,
     Callout,
+    CodeBlock,
     Control,
     CopyButton,
     Dialog,
@@ -88,6 +96,9 @@ import { iconPlus } from '../shared/icons';
               <dd>
                 <code>{{ s.publicKey }}</code
                 ><app-copy-button [text]="s.publicKey" what="public key" />
+                <button type="button" os-button size="sm" (click)="showConnection(s)">
+                  Get a connection string
+                </button>
               </dd>
             </div>
             <div>
@@ -203,6 +214,26 @@ import { iconPlus } from '../shared/icons';
     } @else if (loading.slow()) {
       <os-skeleton [lines]="8" />
     }
+
+    <dialog os-dialog [(open)]="connectionOpen">
+      @if (connection(); as c) {
+        <header os-dialog-header>
+          <h2 os-dialog-title>Connection string for {{ c.name }}</h2>
+        </header>
+        <div os-dialog-body class="stack">
+          <p>{{ c.instructions }}</p>
+          <os-code-block wrap [code]="c.value" what="connection string" />
+          <p class="os-hint">
+            The secret is only shown when it’s made. To get a string that holds it, replace the
+            secret: backends using the old secret stop working until they get the new one, and their
+            users see only messages for everyone meanwhile.
+          </p>
+        </div>
+        <footer os-dialog-footer>
+          <button os-button os-dialog-close variant="primary" type="button">Done</button>
+        </footer>
+      }
+    </dialog>
 
     <dialog os-dialog [(open)]="createOpen">
       <header os-dialog-header><h2 os-dialog-title>New system</h2></header>
@@ -332,6 +363,9 @@ export class Systems {
 
   private readonly origin = computed(() => location.origin);
 
+  protected readonly connectionOpen = signal(false);
+  protected readonly connection = signal<(Connection & { name: string }) | null>(null);
+
   constructor() {
     effect(() => {
       void this.load(this.tenant());
@@ -381,6 +415,12 @@ const token = await signUser(process.env.OPENANNOUNCE_SECRET, {
     };
   }
 
+  /** A connection string without the secret, which was only shown when it was made. */
+  protected showConnection(s: System): void {
+    this.connection.set({ name: s.name, ...connectionFor(s, this.origin()) });
+    this.connectionOpen.set(true);
+  }
+
   protected openCreate(): void {
     this.newName = '';
     this.createError.set(null);
@@ -404,6 +444,7 @@ const token = await signUser(process.env.OPENANNOUNCE_SECRET, {
         secret: created.signingSecret,
         what: 'secret',
         instructions: 'Put it in your backend’s settings, for example as OPENANNOUNCE_SECRET. Never put it in browser code.',
+        connection: connectionFor(created, this.origin(), { signingSecret: created.signingSecret }),
       });
     } catch (error) {
       this.createError.set(errorText(error));
@@ -430,7 +471,8 @@ const token = await signUser(process.env.OPENANNOUNCE_SECRET, {
         title: `New secret for ${rotated.name}`,
         secret: rotated.signingSecret,
         what: 'secret',
-        instructions: 'Put it in your backend’s settings, for example as OPENANNOUNCE_SECRET. Never put it in browser code.',
+        instructions: 'Backends using the old secret stop working until they get this one. Put it in your backend’s settings, for example as OPENANNOUNCE_SECRET. Never put it in browser code.',
+        connection: connectionFor(rotated, this.origin(), { signingSecret: rotated.signingSecret }),
       });
     } catch (error) {
       this.toaster.show(errorText(error), { tone: 'danger' });
@@ -459,6 +501,7 @@ const token = await signUser(process.env.OPENANNOUNCE_SECRET, {
         secret: made.publishKey,
         what: 'publish key',
         instructions: 'Paste it into the system that posts here, for example OpenVersion’s OpenAnnounce integration.',
+        connection: connectionFor(made, this.origin(), { publishKey: made.publishKey }),
       });
     } catch (error) {
       this.toaster.show(errorText(error), { tone: 'danger' });
