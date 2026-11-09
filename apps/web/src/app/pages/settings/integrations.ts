@@ -1,6 +1,16 @@
-import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { Button, SectionHeader, SettingCard } from '@openstuff-dev/ui-angular';
+import type { System } from '@open-announce/contracts';
+import {
+  Button,
+  Callout,
+  EmptyState,
+  SectionHeader,
+  SettingCard,
+  Skeleton,
+} from '@openstuff-dev/ui-angular';
+import { Api, errorText } from '../../core/api';
+import { slowLoading } from '../../core/loading';
 import { ServerConnections } from './server-connections';
 
 /**
@@ -9,25 +19,54 @@ import { ServerConnections } from './server-connections';
  */
 @Component({
   selector: 'app-integrations',
-  imports: [RouterLink, Button, SectionHeader, SettingCard, ServerConnections],
+  imports: [
+    RouterLink,
+    Button,
+    Callout,
+    EmptyState,
+    SectionHeader,
+    SettingCard,
+    ServerConnections,
+    Skeleton,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'stack' },
   template: `
     <header
       os-section-header
       title="Integrations"
-      description="How OpenAnnounce works with other systems: the ones that post here, and the OpenStuff apps it connects to."
+      description="Connect OpenAnnounce to the rest of OpenStuff. Each one is optional, and nothing changes until you connect it."
     ></header>
 
     @if (tenant() && admin()) {
       <section
         os-setting-card
         title="Other systems post here"
-        description="Each system on the Systems page has a publish key, so its backend can post messages here, and a public key, so its app can show them."
+        description="A system with a publish key can post News here, such as OpenVersion’s release notes."
       >
-        <div class="systems-link">
-          <a os-button [routerLink]="['/t', tenant(), 'systems']">Open Systems</a>
-        </div>
+        @if (error(); as error) {
+          <os-callout tone="danger" title="The systems didn’t load">{{ error }}</os-callout>
+        } @else if (systems()) {
+          @if (posting().length === 0) {
+            <os-empty-state title="No system can post here yet">
+              <p>
+                Make a publish key for a system on the Systems page, and give it to the backend that
+                posts.
+              </p>
+              <div><a os-button [routerLink]="systemsLink()">Open Systems</a></div>
+            </os-empty-state>
+          } @else {
+            <p class="posting">
+              {{ posting().length === 1 ? 'This system has' : 'These systems have' }} a publish key:
+              {{ postingNames() }}.
+            </p>
+            <div class="systems-link">
+              <a os-button [routerLink]="systemsLink()">Open Systems</a>
+            </div>
+          }
+        } @else if (loading.slow()) {
+          <os-skeleton [lines]="2" />
+        }
       </section>
     }
 
@@ -36,6 +75,11 @@ import { ServerConnections } from './server-connections';
     }
   `,
   styles: `
+    .posting {
+      margin: 0;
+      padding: var(--os-space-4) var(--os-space-5) 0;
+    }
+
     .systems-link {
       padding: var(--os-space-4) var(--os-space-5);
     }
@@ -46,4 +90,34 @@ export class Integrations {
   readonly tenant = input('');
   readonly admin = input(false);
   readonly serverAdmin = input(false);
+
+  private readonly api = inject(Api);
+  protected readonly systems = signal<System[] | null>(null);
+  protected readonly error = signal<string | null>(null);
+  protected readonly loading = slowLoading();
+  protected readonly posting = computed(() =>
+    (this.systems() ?? []).filter((system) => system.publishKeyHint),
+  );
+
+  protected readonly postingNames = computed(() => this.posting().map((s) => s.name).join(', '));
+  protected readonly systemsLink = computed(() => ['/t', this.tenant(), 'systems']);
+
+  constructor() {
+    effect(() => {
+      const tenant = this.tenant();
+      if (tenant && this.admin()) void this.load(tenant);
+    });
+  }
+
+  private async load(tenant: string): Promise<void> {
+    this.error.set(null);
+    try {
+      const systems = await this.loading.track(
+        this.api.get<System[]>(`/api/t/${encodeURIComponent(tenant)}/systems`),
+      );
+      if (tenant === this.tenant()) this.systems.set(systems);
+    } catch (error) {
+      this.error.set(errorText(error));
+    }
+  }
 }

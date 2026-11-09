@@ -91,7 +91,7 @@ const GROUP_ORDER: readonly SettingsGroupKey[] = ['you', 'tenant', 'server'];
             <app-data [tenant]="tenant()" />
           }
           @case ('tenants') {
-            <app-tenants />
+            <app-tenants [tenant]="tenant()" />
           }
         }
       }
