@@ -1,5 +1,12 @@
 import type { Role } from '@open-announce/contracts';
-import { iconAccount, iconAppearance, iconData, iconMembers, iconTenants } from '../../shared/icons';
+import {
+  iconAccount,
+  iconAppearance,
+  iconData,
+  iconIntegrations,
+  iconMembers,
+  iconTenants,
+} from '../../shared/icons';
 
 /** The groups of the Settings menu, in the order they show. */
 export type SettingsGroupKey = 'you' | 'tenant' | 'server';
@@ -11,7 +18,7 @@ export interface Who {
   readonly isServerAdmin: boolean;
 }
 
-export type SettingsTabId = 'account' | 'appearance' | 'members' | 'data' | 'tenants';
+export type SettingsTabId = 'account' | 'appearance' | 'members' | 'integrations' | 'data' | 'tenants';
 
 export interface SettingsTab {
   readonly id: SettingsTabId;
@@ -30,6 +37,13 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   { id: 'account', label: 'Account', icon: iconAccount, group: 'you', visible: everyone },
   { id: 'appearance', label: 'Appearance', icon: iconAppearance, group: 'you', visible: everyone },
   { id: 'members', label: 'Members', icon: iconMembers, group: 'tenant', visible: admin },
+  {
+    id: 'integrations',
+    label: 'Integrations',
+    icon: iconIntegrations,
+    group: 'tenant',
+    visible: (who) => who.role === 'admin' || who.isServerAdmin,
+  },
   { id: 'data', label: 'Export and import', icon: iconData, group: 'tenant', visible: admin },
   { id: 'tenants', label: 'Tenants', icon: iconTenants, group: 'server', visible: (who) => who.isServerAdmin },
 ];

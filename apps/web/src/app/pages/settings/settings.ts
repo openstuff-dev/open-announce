@@ -5,6 +5,7 @@ import { Session } from '../../core/session';
 import { Account } from './account';
 import { Appearance } from './appearance';
 import { Data } from './data';
+import { Integrations } from './integrations';
 import { Members } from './members';
 import { Tenants } from './tenants';
 import {
@@ -29,6 +30,7 @@ const GROUP_ORDER: readonly SettingsGroupKey[] = ['you', 'tenant', 'server'];
     Account,
     Appearance,
     Data,
+    Integrations,
     Members,
     Tenants,
     NavLink,
@@ -77,6 +79,13 @@ const GROUP_ORDER: readonly SettingsGroupKey[] = ['you', 'tenant', 'server'];
           }
           @case ('members') {
             <app-members [tenant]="tenant()" />
+          }
+          @case ('integrations') {
+            <app-integrations
+              [tenant]="tenant()"
+              [admin]="who().role === 'admin'"
+              [serverAdmin]="who().isServerAdmin"
+            />
           }
           @case ('data') {
             <app-data [tenant]="tenant()" />
