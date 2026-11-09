@@ -3,6 +3,13 @@
 Each release is a Docker image at `ghcr.io/openstuff-dev/open-announce:<version>`.
 Migrations run when the new version starts and only move forward, so back up first.
 
+## 0.2.1
+
+### Image
+
+- The image builds again. 0.2.0 was tagged but its image failed to build, because the contracts package used
+  `@openstuff-dev/server` without listing it as a dependency. 0.2.1 is the first image with 0.2.0's changes.
+
 ## 0.2.0
 
 Migrations `003_server_integrations`, `004_openversion_deploy_token` and
