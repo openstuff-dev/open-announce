@@ -157,3 +157,5 @@ export interface TenantExport {
 export interface ApiError {
   error: string;
 }
+
+export { connectionFor, type Connection, type ConnectionSecret } from './connection-string.js';
