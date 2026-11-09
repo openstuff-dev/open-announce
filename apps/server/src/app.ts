@@ -3,8 +3,8 @@ import fastifyStatic from '@fastify/static';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { loadVault } from '@openstuff-dev/server';
-import { registerAuth } from './auth.js';
+import { loadVault, publishVersionOnStart, registerIntegrationRoutes } from '@openstuff-dev/server';
+import { registerAuth, requireAccount } from './auth.js';
 import type { Config } from './config.js';
 import { policyFrom } from './config.js';
 import type { Pool } from './db.js';
@@ -15,11 +15,10 @@ import { registerDemo } from './routes/demo.js';
 import { registerFeedRoutes } from './routes/feed.js';
 import { registerMessageRoutes } from './routes/messages.js';
 import { registerPublishRoutes } from './routes/publish.js';
-import { registerServerIntegrationRoutes } from './routes/server-integrations.js';
 import { registerSystemRoutes } from './routes/systems.js';
 import { registerTenantRoutes } from './routes/tenants.js';
 import { registerTransferRoutes } from './routes/transfer.js';
-import { connectionFor, publishOwnVersion } from './openversion.js';
+import { integrationOffers } from './integrations.js';
 
 export async function buildApp(config: Config, pool: Pool): Promise<FastifyInstance> {
   const app = Fastify({ logger: { level: config.logLevel }, trustProxy: config.trustProxy });
@@ -45,19 +44,24 @@ export async function buildApp(config: Config, pool: Pool): Promise<FastifyInsta
     envName: 'OPENANNOUNCE_SECRET_KEY',
     log: app.log,
   });
-  registerServerIntegrationRoutes(app, pool, config, vault);
-  // After the server is listening, publish this image's version if OpenVersion is connected. Never
-  // blocks startup and never fails it: not awaited, so listening never waits for OpenVersion.
-  app.addHook('onListen', () => {
-    const publish = async () => {
-      const connection = await connectionFor(pool, config, vault);
-      if (connection) {
-        await publishOwnVersion(policyFrom(config), connection, config.appVersion, app.log);
-      }
-    };
-    publish().catch((error: unknown) => {
-      app.log.warn({ err: (error as Error).message }, 'Skipped publishing this version.');
-    });
+  // Server-wide connections from the shared package, the same routes every OpenStuff app has.
+  const offers = integrationOffers(config);
+  registerIntegrationRoutes(app, {
+    db: pool,
+    vault: () => Promise.resolve(vault),
+    policy: policyFrom(config),
+    origin: new URL(config.publicUrl).origin,
+    appName: 'OpenAnnounce',
+    offers,
+    isServerAdmin: (request) => requireAccount(request).isServerAdmin,
+  });
+  publishVersionOnStart(app, {
+    db: pool,
+    vault: () => Promise.resolve(vault),
+    offer: offers[0],
+    policy: policyFrom(config),
+    appName: 'OpenAnnounce',
+    version: config.appVersion,
   });
   // The built @openstuff-dev/announce, so a host can load it from here instead of npm, and the
   // admin app's previews use the same code the hosts run.
