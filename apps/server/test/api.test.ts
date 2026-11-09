@@ -12,6 +12,8 @@ import type {
   SystemWithSecret,
   TenantExport,
 } from '@open-announce/contracts';
+import { makeConnectionString, type ServerIntegration } from '@openstuff-dev/server';
+import { type StandIn, standInOpenVersion } from '@openstuff-dev/server/testing';
 import { buildApp } from '../src/app.js';
 import { hashPassword } from '../src/auth.js';
 import { loadConfig } from '../src/config.js';
@@ -284,6 +286,114 @@ describe.skipIf(!url)('API against Postgres', () => {
         systemIds: [other.systemId], groupIds: [other.groupId],
       });
       expect(saved.json<Message>()).toMatchObject({ systemIds: [], groupIds: [] });
+    });
+  });
+
+  // A second server on the same database may reach the stand-in on 127.0.0.1, as a self-hosted
+  // one with OPENANNOUNCE_FETCH=private would. Sessions live in the database, so cookies work.
+  describe('connecting OpenVersion by pasting a connection string', () => {
+    const ANNOUNCE = 'https://announce.example.com';
+    const KEY = 'pk_announce_app_12345678';
+    const DEPLOY = 'ov_announce_deploy_12345678';
+    let wired: FastifyInstance;
+    let ov: StandIn;
+
+    const put = (connectionString: string) =>
+      wired.inject({
+        method: 'PUT',
+        url: '/api/admin/integrations/openversion',
+        payload: { connectionString },
+        headers: { cookie: admin },
+      });
+    const card = (response: { json: () => unknown }) => response.json() as ServerIntegration;
+
+    beforeAll(async () => {
+      ov = await standInOpenVersion({
+        publicKey: KEY,
+        deployToken: DEPLOY,
+        allowedOrigins: [ANNOUNCE],
+      });
+      wired = await buildApp(
+        {
+          ...loadConfig({ OPENANNOUNCE_FETCH: 'private', OPENANNOUNCE_PUBLIC_URL: ANNOUNCE }),
+          databaseUrl: url,
+          logLevel: 'silent',
+        },
+        pool,
+      );
+    });
+
+    afterAll(async () => {
+      await pool.query('DELETE FROM server_integrations');
+      await wired.close();
+      await ov.close();
+    });
+
+    it('UC-5/S1 one paste connects it, tested straight away with this server’s origin', async () => {
+      ov.requests.length = 0;
+      const response = await put(
+        makeConnectionString('openversion', { url: ov.url, publicKey: KEY, deployToken: DEPLOY }),
+      );
+      expect(response.statusCode).toBe(200);
+      expect(card(response)).toMatchObject({ status: 'connected', hasDeployToken: true });
+      expect(ov.requests.find((r) => r.path.startsWith('/api/v1/version'))?.headers.origin).toBe(ANNOUNCE);
+    });
+
+    it('UC-5/S6 the page never shows the deploy token again, and only a server admin sees the card', async () => {
+      const list = await wired.inject({ method: 'GET', url: '/api/admin/integrations', headers: { cookie: admin } });
+      expect(list.json()).toContainEqual(expect.objectContaining({ kind: 'openversion', hasDeployToken: true }));
+      expect(list.body).not.toContain(DEPLOY);
+      const asDeveloper = { cookie: developer };
+      expect((await wired.inject({ method: 'GET', url: '/api/admin/integrations', headers: asDeveloper })).statusCode).toBe(403);
+      expect((await wired.inject({ method: 'GET', url: '/api/admin/integrations' })).statusCode).toBe(401);
+    });
+
+    it('UC-5/S2 an unknown key, a blocked origin or a silent address says what to fix', async () => {
+      const unknown = await put(makeConnectionString('openversion', { url: ov.url, publicKey: 'pk_unknown_12345678' }));
+      expect(card(unknown).message).toContain('OpenVersion doesn’t recognise this public key');
+
+      const strict = await standInOpenVersion({ publicKey: KEY, allowedOrigins: ['https://else.example.com'] });
+      const blocked = await put(makeConnectionString('openversion', { url: strict.url, publicKey: KEY }));
+      await strict.close();
+      expect(card(blocked).message).toContain(`Add ${ANNOUNCE} to allowed origins in OpenVersion`);
+      expect(card(blocked).copy).toBe(ANNOUNCE);
+
+      const down = await put(makeConnectionString('openversion', { url: strict.url, publicKey: KEY }));
+      expect(card(down).message).toContain('That address didn’t answer');
+    });
+
+    it('UC-5/S2 a connection string from OpenAnnounce itself is refused by name', async () => {
+      const wrong = await put(makeConnectionString('openannounce', { url: ov.url, publicKey: KEY }));
+      expect(wrong.statusCode).toBe(400);
+      expect(wrong.body).toContain('That’s a connection string from OpenAnnounce. Paste one from OpenVersion.');
+    });
+
+    it('UC-5/S5 a connection the server’s variables set is read-only on the card', async () => {
+      const fromEnv = await buildApp(
+        {
+          ...loadConfig({
+            OPENANNOUNCE_OPENVERSION_URL: 'https://versions.example.com',
+            OPENANNOUNCE_OPENVERSION_PUBLIC_KEY: 'pk_env_version_1234',
+          }),
+          databaseUrl: url,
+          logLevel: 'silent',
+        },
+        pool,
+      );
+      try {
+        const headers = { cookie: admin };
+        const list = await fromEnv.inject({ method: 'GET', url: '/api/admin/integrations', headers });
+        expect(list.json()).toContainEqual(expect.objectContaining({ kind: 'openversion', status: 'set-by-server' }));
+        const save = await fromEnv.inject({
+          method: 'PUT',
+          url: '/api/admin/integrations/openversion',
+          headers,
+          payload: { url: 'https://other.example.com', publicKey: 'pk_other_12345678' },
+        });
+        expect(save.statusCode).toBe(409);
+      } finally {
+        await fromEnv.close();
+      }
     });
   });
 
