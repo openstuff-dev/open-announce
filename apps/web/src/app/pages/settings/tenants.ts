@@ -12,13 +12,14 @@ import {
   Field,
   SectionHeader,
   SettingCard,
+  SettingCardBody,
   SettingCardFooter,
   Skeleton,
+  slowLoading,
   Toaster,
 } from '@openstuff-dev/ui-angular';
 import { Api, errorText } from '../../core/api';
 import { IdempotencyKey } from '../../core/idempotency';
-import { slowLoading } from '../../core/loading';
 import { Session } from '../../core/session';
 import { shortDate } from '../../shared/labels';
 
@@ -36,6 +37,7 @@ import { shortDate } from '../../shared/labels';
     Field,
     SectionHeader,
     SettingCard,
+    SettingCardBody,
     SettingCardFooter,
     Skeleton,
   ],
@@ -54,16 +56,18 @@ import { shortDate } from '../../shared/labels';
       description="Make a tenant for a company or division."
       (ngSubmit)="create()"
     >
-      <os-field label="Tenant name" [error]="createError()">
-        <input
-          os-input
-          name="name"
-          required
-          maxlength="120"
-          placeholder="Acme Corp"
-          [(ngModel)]="name"
-        />
-      </os-field>
+      <div os-setting-card-body>
+        <os-field label="Tenant name" [error]="createError()">
+          <input
+            os-input
+            name="name"
+            required
+            maxlength="120"
+            placeholder="Acme Corp"
+            [(ngModel)]="name"
+          />
+        </os-field>
+      </div>
       <div os-setting-card-footer>
         <button os-button variant="primary" type="submit" [loading]="creating()">Add tenant</button>
       </div>

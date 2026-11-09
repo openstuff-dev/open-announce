@@ -22,16 +22,17 @@ import {
   EmptyState,
   Field,
   Icon,
+  onReturn,
   PageHeader,
   SecretDialog,
   Skeleton,
+  slowLoading,
   Tab,
   Tabs,
   Toaster,
 } from '@openstuff-dev/ui-angular';
 import { Api, errorText } from '../core/api';
 import { IdempotencyKey } from '../core/idempotency';
-import { onReturn, slowLoading } from '../core/loading';
 import { Session } from '../core/session';
 import { CopyButton } from '../shared/copy-button';
 import { iconPlus } from '../shared/icons';
@@ -159,28 +160,23 @@ import { iconPlus } from '../shared/icons';
 
           <os-tabs label="Set up {{ s.name }}">
             <ng-template os-tab="install" label="Install">
-              <pre><code>{{ snippets(s).install }}</code></pre>
-              <app-copy-button [text]="snippets(s).install" what="install command" />
+              <os-code-block [code]="snippets(s).install" what="install command" />
             </ng-template>
             <ng-template os-tab="config" label="openannounce.config.js">
-              <pre><code>{{ snippets(s).config }}</code></pre>
-              <app-copy-button [text]="snippets(s).config" what="config" />
+              <os-code-block [code]="snippets(s).config" what="config" />
             </ng-template>
             <ng-template os-tab="page" label="Page">
-              <pre><code>{{ snippets(s).page }}</code></pre>
-              <app-copy-button [text]="snippets(s).page" what="page code" />
+              <os-code-block [code]="snippets(s).page" what="page code" />
             </ng-template>
             <ng-template os-tab="backend" label="Backend">
-              <pre><code>{{ snippets(s).backend }}</code></pre>
-              <app-copy-button [text]="snippets(s).backend" what="backend code" />
+              <os-code-block [code]="snippets(s).backend" what="backend code" />
             </ng-template>
             <ng-template os-tab="publish" label="Publish API">
               <p class="tab-note">
                 Another system (OpenVersion, a CI job) posts News here with the publish key. Send an
                 Idempotency-Key, such as the id of what you announce, so a retry never posts twice.
               </p>
-              <pre><code>{{ snippets(s).publish }}</code></pre>
-              <app-copy-button [text]="snippets(s).publish" what="publish example" />
+              <os-code-block [code]="snippets(s).publish" what="publish example" />
             </ng-template>
           </os-tabs>
 
@@ -323,15 +319,6 @@ import { iconPlus } from '../shared/icons';
 
     .origins os-field {
       inline-size: 100%;
-    }
-
-    pre {
-      overflow-x: auto;
-      margin: 0 0 var(--os-space-2);
-      padding: var(--os-space-3);
-      border-radius: var(--os-radius-md);
-      background: var(--os-bg-alternative);
-      font-size: var(--os-text-sm);
     }
 
     .danger {

@@ -27,15 +27,16 @@ import {
   EmptyState,
   Field,
   Icon,
+  onReturn,
   PageHeader,
   SegmentedControl,
   Skeleton,
+  slowLoading,
   Switch,
   Toaster,
 } from '@openstuff-dev/ui-angular';
 import { Api, errorText } from '../core/api';
 import { IdempotencyKey } from '../core/idempotency';
-import { onReturn, slowLoading } from '../core/loading';
 import { Session } from '../core/session';
 import { iconPlus } from '../shared/icons';
 import {
