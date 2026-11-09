@@ -22,16 +22,17 @@ import {
   EmptyState,
   Field,
   Icon,
+  onReturn,
   PageHeader,
   SecretDialog,
   Skeleton,
+  slowLoading,
   Tab,
   Tabs,
   Toaster,
 } from '@openstuff-dev/ui-angular';
 import { Api, errorText } from '../core/api';
 import { IdempotencyKey } from '../core/idempotency';
-import { onReturn, slowLoading } from '../core/loading';
 import { Session } from '../core/session';
 import { CopyButton } from '../shared/copy-button';
 import { iconPlus } from '../shared/icons';

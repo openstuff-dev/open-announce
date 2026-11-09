@@ -7,10 +7,11 @@ import {
   EmptyState,
   SectionHeader,
   SettingCard,
+  SettingCardBody,
   Skeleton,
+  slowLoading,
 } from '@openstuff-dev/ui-angular';
 import { Api, errorText } from '../../core/api';
-import { slowLoading } from '../../core/loading';
 import { ServerConnections } from './server-connections';
 
 /**
@@ -26,6 +27,7 @@ import { ServerConnections } from './server-connections';
     EmptyState,
     SectionHeader,
     SettingCard,
+    SettingCardBody,
     ServerConnections,
     Skeleton,
   ],
@@ -44,29 +46,29 @@ import { ServerConnections } from './server-connections';
         title="Other systems post here"
         description="A system with a publish key can post News here, such as OpenVersion’s release notes."
       >
-        @if (error(); as error) {
-          <os-callout tone="danger" title="The systems didn’t load">{{ error }}</os-callout>
-        } @else if (systems()) {
-          @if (posting().length === 0) {
-            <os-empty-state title="No system can post here yet">
-              <p>
-                Make a publish key for a system on the Systems page, and give it to the backend that
-                posts.
+        <div os-setting-card-body>
+          @if (error(); as error) {
+            <os-callout tone="danger" title="The systems didn’t load">{{ error }}</os-callout>
+          } @else if (systems()) {
+            @if (posting().length === 0) {
+              <os-empty-state title="No system can post here yet">
+                <p>
+                  Make a publish key for a system on the Systems page, and give it to the backend
+                  that posts.
+                </p>
+                <div><a os-button [routerLink]="systemsLink()">Open Systems</a></div>
+              </os-empty-state>
+            } @else {
+              <p class="posting">
+                {{ posting().length === 1 ? 'This system has' : 'These systems have' }} a publish
+                key: {{ postingNames() }}.
               </p>
               <div><a os-button [routerLink]="systemsLink()">Open Systems</a></div>
-            </os-empty-state>
-          } @else {
-            <p class="posting">
-              {{ posting().length === 1 ? 'This system has' : 'These systems have' }} a publish key:
-              {{ postingNames() }}.
-            </p>
-            <div class="systems-link">
-              <a os-button [routerLink]="systemsLink()">Open Systems</a>
-            </div>
+            }
+          } @else if (loading.slow()) {
+            <os-skeleton [lines]="2" />
           }
-        } @else if (loading.slow()) {
-          <os-skeleton [lines]="2" />
-        }
+        </div>
       </section>
     }
 
@@ -77,11 +79,6 @@ import { ServerConnections } from './server-connections';
   styles: `
     .posting {
       margin: 0;
-      padding: var(--os-space-4) var(--os-space-5) 0;
-    }
-
-    .systems-link {
-      padding: var(--os-space-4) var(--os-space-5);
     }
   `,
 })

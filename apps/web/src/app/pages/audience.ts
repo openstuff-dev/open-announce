@@ -17,13 +17,14 @@ import {
   DialogHeader,
   DialogTitle,
   Field,
+  onReturn,
   PageHeader,
   Skeleton,
+  slowLoading,
   Toaster,
 } from '@openstuff-dev/ui-angular';
 import { Api, errorText } from '../core/api';
 import { IdempotencyKey } from '../core/idempotency';
-import { onReturn, slowLoading } from '../core/loading';
 
 interface AudienceData {
   groups: Group[];

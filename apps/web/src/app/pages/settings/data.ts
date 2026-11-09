@@ -1,5 +1,12 @@
 import { ChangeDetectionStrategy, Component, inject, input, signal } from '@angular/core';
-import { Button, Callout, FileInput, SectionHeader, SettingCard } from '@openstuff-dev/ui-angular';
+import {
+  Button,
+  Callout,
+  FileInput,
+  SectionHeader,
+  SettingCard,
+  SettingCardBody,
+} from '@openstuff-dev/ui-angular';
 import { Api, errorText } from '../../core/api';
 
 interface ImportResult {
@@ -12,7 +19,7 @@ interface ImportResult {
 /** Everything in this tenant as one JSON file, and back again. */
 @Component({
   selector: 'app-data',
-  imports: [Button, Callout, FileInput, SectionHeader, SettingCard],
+  imports: [Button, Callout, FileInput, SectionHeader, SettingCard, SettingCardBody],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'stack' },
   template: `
@@ -27,7 +34,9 @@ interface ImportResult {
       title="Export"
       description="One JSON file with this tenant’s systems, groups, users and messages. Secrets aren’t in it: an import makes new keys."
     >
-      <div><a os-button variant="primary" [href]="exportUrl()" download>Download export</a></div>
+      <div os-setting-card-body>
+        <div><a os-button variant="primary" [href]="exportUrl()" download>Download export</a></div>
+      </div>
     </section>
 
     <section
@@ -35,23 +44,25 @@ interface ImportResult {
       title="Import"
       description="Adds what’s in an export file to this tenant. Systems, groups and users with the same slug or id are updated; messages are always added."
     >
-      <input
-        type="file"
-        os-file-input
-        accept="application/json,.json"
-        aria-label="Export file"
-        (change)="pick($event)"
-        [disabled]="busy()"
-      />
-      @if (result(); as r) {
-        <os-callout tone="success" title="Imported">
-          {{ r.systems }} systems, {{ r.groups }} groups, {{ r.users }} users and
-          {{ r.messages }} messages. New systems have new keys: copy them from Systems.
-        </os-callout>
-      }
-      @if (error(); as error) {
-        <os-callout tone="danger" title="Nothing was imported">{{ error }}</os-callout>
-      }
+      <div os-setting-card-body>
+        <input
+          type="file"
+          os-file-input
+          accept="application/json,.json"
+          aria-label="Export file"
+          (change)="pick($event)"
+          [disabled]="busy()"
+        />
+        @if (result(); as r) {
+          <os-callout tone="success" title="Imported">
+            {{ r.systems }} systems, {{ r.groups }} groups, {{ r.users }} users and
+            {{ r.messages }} messages. New systems have new keys: copy them from Systems.
+          </os-callout>
+        }
+        @if (error(); as error) {
+          <os-callout tone="danger" title="Nothing was imported">{{ error }}</os-callout>
+        }
+      </div>
     </section>
   `,
 })
