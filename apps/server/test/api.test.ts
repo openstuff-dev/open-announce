@@ -288,14 +288,14 @@ describe.skipIf(!url)('API against Postgres', () => {
   });
 
   describe('server connections stay out of exports', () => {
-    it('leaves the saved OpenVersion connection out of a tenant export', async () => {
+    it('UC-5/S6 leaves the saved OpenVersion connection out of a tenant export', async () => {
       const connectionUrl = 'https://versions.example.com';
       const connectionKey = 'pk_export_check_0123456789';
       const sealedToken = 'sealed-deploy-token-export-check';
       await pool.query(
-        `INSERT INTO server_integrations (kind, url, public_key, deploy_token_sealed) VALUES ('openversion', $1, $2, $3)
+        `INSERT INTO server_integrations (kind, url, public_key, deploy_token_encrypted) VALUES ('openversion', $1, $2, $3)
          ON CONFLICT (kind) DO UPDATE SET url = EXCLUDED.url, public_key = EXCLUDED.public_key,
-           deploy_token_sealed = EXCLUDED.deploy_token_sealed`,
+           deploy_token_encrypted = EXCLUDED.deploy_token_encrypted`,
         [connectionUrl, connectionKey, sealedToken],
       );
       const response = await inject(admin, 'GET', '/api/t/demo/export');
